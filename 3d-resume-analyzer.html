@@ -1,0 +1,3261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GIMME YOUR RESUME</title>
+    <!-- Three.js for 3D graphics -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    <!-- GSAP for animations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- We'll use fetch API directly for Gemini API calls -->
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Poppins', sans-serif;
+            color: white;
+        }
+
+        /* Achievement system styles */
+        .achievement-container {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            pointer-events: none;
+        }
+
+        .achievement {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transform: translateX(-120%);
+            opacity: 0;
+            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.5s ease;
+            max-width: 300px;
+        }
+
+        .achievement.show {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        .achievement-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #ff3366, #ff9933);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+
+        .achievement-content {
+            flex-grow: 1;
+        }
+
+        .achievement-title {
+            font-weight: 600;
+            font-size: 14px;
+            margin: 0 0 4px 0;
+            color: #fff;
+        }
+
+        .achievement-description {
+            font-size: 12px;
+            margin: 0;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .achievement-progress {
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            margin-top: 6px;
+            overflow: hidden;
+        }
+
+        .achievement-progress-bar {
+            height: 100%;
+            background: linear-gradient(to right, #ff3366, #ff9933);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .achievements-badge {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4f46e5, #60a5fa);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 99;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .achievements-badge:hover {
+            transform: scale(1.1);
+        }
+
+        .achievements-count {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: #ff3366;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.2);
+        }
+
+        .content-container {
+            position: relative;
+            z-index: 10;
+            padding: 2rem;
+            height: 100vh;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+            pointer-events: auto;
+        }
+
+        .content-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .content-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .content-container::-webkit-scrollbar-thumb {
+            background-color: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+
+        .upload-area {
+            border: 2px dashed rgba(255, 255, 255, 0.5);
+            border-radius: 15px;
+            padding: 3rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            z-index: 100;
+            pointer-events: auto;
+        }
+
+        .upload-area:hover {
+            border-color: #60a5fa;
+            background: rgba(96, 165, 250, 0.1);
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #4f46e5, #60a5fa);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+        }
+
+        .chat-bubble {
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(45deg, #ff3366, #ff9933);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(255, 51, 102, 0.4);
+            transition: all 0.3s ease;
+            z-index: 1000;
+            animation: pulse-glow 2s infinite alternate;
+            pointer-events: auto;
+        }
+
+        .chat-bubble:hover {
+            transform: scale(1.1) rotate(5deg);
+            box-shadow: 0 12px 24px rgba(255, 51, 102, 0.6);
+        }
+
+        @keyframes pulse-glow {
+            0% {
+                box-shadow: 0 0 10px rgba(255, 51, 102, 0.6);
+            }
+            100% {
+                box-shadow: 0 0 25px rgba(255, 51, 102, 0.8), 0 0 40px rgba(255, 153, 51, 0.4);
+            }
+        }
+
+        .chat-modal {
+            position: fixed;
+            top: 6rem;
+            right: 2rem;
+            width: 380px;
+            max-height: 550px;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+            transform-origin: top right;
+            border: 1px solid rgba(255, 51, 102, 0.3);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 0 30px rgba(255, 51, 102, 0.2);
+        }
+
+        .chat-header {
+            padding: 1.2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 51, 102, 0.3);
+            background: linear-gradient(to right, rgba(255, 51, 102, 0.1), rgba(255, 153, 51, 0.1));
+            border-radius: 15px 15px 0 0;
+        }
+
+        .chat-messages {
+            padding: 1.2rem;
+            overflow-y: auto;
+            flex-grow: 1;
+            max-height: 350px;
+            display: flex;
+            flex-direction: column;
+            background-color: rgba(0, 0, 0, 0.2);
+            background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .chat-input-container {
+            padding: 1.2rem;
+            border-top: 1px solid rgba(255, 51, 102, 0.3);
+            display: flex;
+            background: linear-gradient(to right, rgba(255, 51, 102, 0.05), rgba(255, 153, 51, 0.05));
+            border-radius: 0 0 15px 15px;
+        }
+
+        .chat-input {
+            flex-grow: 1;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 9999px;
+            padding: 0.8rem 1.2rem;
+            color: white;
+            outline: none;
+            transition: all 0.3s ease;
+            font-size: 0.95rem;
+        }
+
+        .chat-input:focus {
+            border-color: rgba(255, 51, 102, 0.5);
+            box-shadow: 0 0 0 2px rgba(255, 51, 102, 0.2);
+        }
+
+        .chat-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .send-btn {
+            background: linear-gradient(45deg, #ff3366, #ff9933);
+            border: none;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            margin-left: 0.8rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 3px 10px rgba(255, 51, 102, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        .send-btn:hover {
+            transform: scale(1.05) rotate(5deg);
+            box-shadow: 0 5px 15px rgba(255, 51, 102, 0.4);
+        }
+
+        .user-message {
+            background: linear-gradient(135deg, rgba(255, 51, 102, 0.2), rgba(255, 153, 51, 0.2));
+            align-self: flex-end;
+            border-radius: 18px 18px 0 18px;
+            padding: 0.9rem 1.2rem;
+            margin-bottom: 1rem;
+            max-width: 80%;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            border-left: 1px solid rgba(255, 255, 255, 0.1);
+            animation: message-pop 0.3s ease-out;
+        }
+
+        .assistant-message {
+            background: linear-gradient(135deg, rgba(79, 70, 229, 0.2), rgba(96, 165, 250, 0.2));
+            align-self: flex-start;
+            border-radius: 18px 18px 18px 0;
+            padding: 0.9rem 1.2rem;
+            margin-bottom: 1rem;
+            max-width: 80%;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            border-left: 1px solid rgba(255, 255, 255, 0.1);
+            animation: message-pop 0.3s ease-out;
+        }
+
+        @keyframes message-pop {
+            0% {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .scale-in {
+            animation: scaleIn 0.3s ease forwards;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .floating {
+            animation: floating 3s ease-in-out infinite;
+        }
+
+        @keyframes floating {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(96, 165, 250, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0); }
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-900">
+    <!-- 3D Background Canvas -->
+    <div id="canvas-container"></div>
+
+    <!-- Achievement System -->
+    <div class="achievements-badge" id="achievements-badge">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+        </svg>
+        <span class="achievements-count" id="achievements-count">0</span>
+    </div>
+
+    <div class="achievement-container" id="achievement-container">
+        <!-- Achievements will be added here dynamically -->
+    </div>
+
+    <!-- Main Content -->
+    <div class="content-container">
+        <header class="flex justify-between items-center mb-8">
+            <div class="flex items-center">
+                <div class="w-10 h-10 rounded-full bg-gradient-to-r from-indigo-600 to-blue-400 flex items-center justify-center mr-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                </div>
+                <h1 class="text-2xl font-bold text-white">GIMME YOUR RESUME</h1>
+            </div>
+        </header>
+
+        <!-- Upload Section -->
+        <div id="upload-section" class="max-w-3xl mx-auto">
+            <div class="glass p-8 mb-8">
+                <h2 class="text-xl font-semibold mb-4">Upload Your Resume</h2>
+                <p class="text-gray-300 mb-6">Get personalized job recommendations, skill gap analysis, and resume improvement suggestions powered by AI.</p>
+
+                <div class="upload-area mb-6" id="upload-area">
+                    <input type="file" id="file-input" class="hidden" accept=".pdf,.docx,.txt">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto mb-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <h3 class="text-lg font-medium mb-2">Drag & drop your resume here</h3>
+                    <p class="text-gray-400">or click to browse files</p>
+                </div>
+
+                <div class="text-center">
+                    <p class="text-sm text-gray-400 mb-2">Supported formats: PDF, DOCX, TXT</p>
+                    <p class="text-sm text-gray-400">Your data is secure and never shared with third parties</p>
+                </div>
+            </div>
+
+            <div id="loading-section" class="glass p-8 text-center hidden">
+                <div class="spinner mb-4"></div>
+                <h3 class="text-lg font-medium mb-2">Analyzing your resume...</h3>
+                <p class="text-gray-400">This will just take a moment</p>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results-section" class="max-w-5xl mx-auto hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-semibold">Analysis Results</h2>
+                <button id="back-button" class="btn">
+                    <span class="flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16l-4-4m0 0l4-4m-4 4h18" />
+                        </svg>
+                        Upload Another Resume
+                    </span>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <!-- Job Recommendations -->
+                <div class="glass p-6">
+                    <div class="flex items-center mb-4">
+                        <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center mr-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-medium">Job Recommendations</h3>
+                    </div>
+
+                    <div id="job-list" class="space-y-4">
+                        <!-- Job items will be inserted here -->
+                    </div>
+                </div>
+
+                <!-- Industry Match Radar Chart -->
+                <div class="glass p-6">
+                    <div class="flex items-center mb-4">
+                        <div class="w-8 h-8 rounded-full bg-teal-500 flex items-center justify-center mr-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-medium">Industry Match</h3>
+                    </div>
+
+                    <div class="flex justify-center items-center h-64">
+                        <canvas id="industry-radar-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Skill Comparison Section -->
+            <div class="glass p-6 mb-8">
+                <div class="flex items-center mb-4">
+                    <div class="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center mr-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-medium">Skill Comparison</h3>
+                </div>
+
+                <div class="mb-4">
+                    <p class="text-gray-300 mb-4">Your skills compared to job market requirements:</p>
+                    <div id="skill-comparison-container" class="space-y-6">
+                        <!-- Skill comparison bars will be inserted here -->
+                    </div>
+                </div>
+
+                <div id="skill-list" class="space-y-4 mt-6">
+                    <h4 class="text-md font-medium">Recommended Skills to Develop:</h4>
+                    <!-- Skill items will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Resume Score Meter -->
+            <div class="glass p-6 mb-8">
+                <div class="flex justify-between items-center mb-6">
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center mr-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-medium">Resume Score</h3>
+                    </div>
+                    <div class="text-2xl font-bold" id="resume-score">0</div>
+                </div>
+
+                <div class="mb-6">
+                    <div class="flex justify-between text-sm mb-1">
+                        <span>Weak</span>
+                        <span>Strong</span>
+                    </div>
+                    <div class="h-4 bg-gray-800 rounded-full overflow-hidden">
+                        <div id="score-bar" class="h-full w-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 transition-all duration-1000 ease-out"></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="bg-gray-800 bg-opacity-50 p-3 rounded-lg">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-sm">ATS Compatibility</span>
+                            <span class="text-sm font-medium" id="ats-score">0%</span>
+                        </div>
+                        <div class="h-2 bg-gray-700 rounded-full overflow-hidden">
+                            <div id="ats-bar" class="h-full w-0 bg-blue-500 transition-all duration-1000"></div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-800 bg-opacity-50 p-3 rounded-lg">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-sm">Impact Statements</span>
+                            <span class="text-sm font-medium" id="impact-score">0%</span>
+                        </div>
+                        <div class="h-2 bg-gray-700 rounded-full overflow-hidden">
+                            <div id="impact-bar" class="h-full w-0 bg-purple-500 transition-all duration-1000"></div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-800 bg-opacity-50 p-3 rounded-lg">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-sm">Keyword Optimization</span>
+                            <span class="text-sm font-medium" id="keyword-score">0%</span>
+                        </div>
+                        <div class="h-2 bg-gray-700 rounded-full overflow-hidden">
+                            <div id="keyword-bar" class="h-full w-0 bg-green-500 transition-all duration-1000"></div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-800 bg-opacity-50 p-3 rounded-lg">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-sm">Readability</span>
+                            <span class="text-sm font-medium" id="readability-score">0%</span>
+                        </div>
+                        <div class="h-2 bg-gray-700 rounded-full overflow-hidden">
+                            <div id="readability-bar" class="h-full w-0 bg-pink-500 transition-all duration-1000"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resume Improvements -->
+            <div class="glass p-6 mb-8">
+                <div class="flex items-center mb-4">
+                    <div class="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center mr-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-medium">Resume Improvement Suggestions</h3>
+                </div>
+
+                <div id="improvement-list" class="space-y-2">
+                    <!-- Improvement items will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Career Timeline Visualization -->
+            <div class="glass p-6 mb-8">
+                <div class="flex items-center mb-4">
+                    <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center mr-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-medium">Career Timeline & Future Path</h3>
+                </div>
+
+                <div class="mb-4">
+                    <p class="text-gray-300 mb-4">Interactive visualization of your career journey and potential future path:</p>
+                    <div class="flex space-x-4 mb-4">
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                            <span class="text-xs text-gray-300">Past/Present</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 rounded-full bg-lime-500 mr-2"></div>
+                            <span class="text-xs text-gray-300">Future Path</span>
+                        </div>
+                    </div>
+                    <div class="relative h-80 overflow-hidden" id="timeline-container">
+                        <canvas id="timeline-canvas" class="w-full h-full"></canvas>
+                        <div id="timeline-controls" class="absolute bottom-4 left-0 right-0 flex justify-center space-x-4">
+                            <button id="timeline-prev" class="bg-gray-800 bg-opacity-70 text-white p-2 rounded-full hover:bg-opacity-90 transition-all">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </button>
+                            <button id="timeline-play" class="bg-gray-800 bg-opacity-70 text-white p-2 rounded-full hover:bg-opacity-90 transition-all">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </button>
+                            <button id="timeline-next" class="bg-gray-800 bg-opacity-70 text-white p-2 rounded-full hover:bg-opacity-90 transition-all">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="timeline-details" class="mt-4 p-4 bg-gray-800 bg-opacity-50 rounded-lg">
+                        <h4 id="position-title" class="font-medium text-lg">Select a position</h4>
+                        <p id="position-date" class="text-sm text-gray-400 mb-2"></p>
+                        <p id="position-description" class="text-gray-300">Click on a position in the timeline to see details</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LinkedIn Bio -->
+            <div class="glass p-6">
+                <div class="flex items-center mb-4">
+                    <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center mr-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-medium">LinkedIn Bio</h3>
+                </div>
+
+                <div class="bg-gray-800 bg-opacity-50 p-4 rounded-lg mb-4">
+                    <p id="linkedin-bio" class="text-gray-300"></p>
+                </div>
+
+                <button id="copy-bio" class="btn">
+                    <span class="flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                        </svg>
+                        Copy to Clipboard
+                    </span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Bubble -->
+    <div class="chat-bubble" id="chat-bubble">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>
+    </div>
+
+    <!-- Chat Modal -->
+    <div class="chat-modal glass hidden" id="chat-modal">
+        <div class="chat-header">
+            <div class="flex items-center">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-r from-pink-500 to-orange-400 flex items-center justify-center mr-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
+                    </svg>
+                </div>
+                <h3 class="font-medium text-lg">Career Assistant</h3>
+            </div>
+            <button id="close-chat" class="text-gray-300 hover:text-white transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+
+        <div class="chat-messages" id="chat-messages">
+            <div class="assistant-message">
+                <span class="font-semibold">👋 Hello!</span> I'm your Career Assistant powered by AI. I can help with resume advice, interview tips, career transitions, and more. What can I help you with today?
+            </div>
+        </div>
+
+        <div class="chat-input-container">
+            <input type="text" class="chat-input" id="chat-input" placeholder="Ask me about careers, resumes, interviews...">
+            <button class="send-btn" id="send-button">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+            </button>
+        </div>
+    </div>
+    <script>
+        // Create a simple achievement system
+        const achievementSystem = {
+            achievements: {},
+            unlockAchievement: function(id) {
+                if (!this.achievements[id]) {
+                    console.log(`Achievement unlocked: ${id}`);
+                    this.achievements[id] = true;
+                }
+            }
+        };
+
+        // Make it globally available
+        window.achievementSystem = achievementSystem;
+
+        // Backend server URL - using our Python resume analyzer server with Gemini API
+        const BACKEND_URL = 'http://localhost:3004';
+
+        // DOM Elements
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('file-input');
+        const uploadSection = document.getElementById('upload-section');
+        const loadingSection = document.getElementById('loading-section');
+        const resultsSection = document.getElementById('results-section');
+        const backButton = document.getElementById('back-button');
+        const jobList = document.getElementById('job-list');
+        const skillList = document.getElementById('skill-list');
+        const improvementList = document.getElementById('improvement-list');
+        const linkedinBio = document.getElementById('linkedin-bio');
+        const copyBio = document.getElementById('copy-bio');
+
+        // Chat Elements
+        const chatBubble = document.getElementById('chat-bubble');
+        const chatModal = document.getElementById('chat-modal');
+        const closeChat = document.getElementById('close-chat');
+        const chatMessages = document.getElementById('chat-messages');
+        const chatInput = document.getElementById('chat-input');
+        const sendButton = document.getElementById('send-button');
+
+        // 3D Background
+        let scene, camera, renderer, particles, smallParticles, largeParticles;
+        let floatingObjects, torusKnot, icosahedron, dodecahedron;
+
+        function initThreeJS() {
+            // Create scene
+            scene = new THREE.Scene();
+
+            // Create camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 30;
+
+            // Create renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setClearColor(0x000000, 0); // transparent background
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // Create multiple particle systems for layered effect
+            createParticleSystems();
+
+            // Add ambient light
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+
+            // Add directional light
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(1, 1, 1);
+            scene.add(directionalLight);
+
+            // Add floating 3D objects
+            createFloatingObjects();
+
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            // Start animation
+            animate();
+        }
+
+        // Create multiple particle systems for a more dynamic background
+        function createParticleSystems() {
+            // Main particle system
+            const particlesGeometry = new THREE.BufferGeometry();
+            const particlesCount = 1800;
+            const posArray = new Float32Array(particlesCount * 3);
+            const colorsArray = new Float32Array(particlesCount * 3);
+
+            for (let i = 0; i < particlesCount * 3; i += 3) {
+                // Position
+                posArray[i] = (Math.random() - 0.5) * 100;
+                posArray[i + 1] = (Math.random() - 0.5) * 100;
+                posArray[i + 2] = (Math.random() - 0.5) * 100;
+
+                // Color - more vibrant colors
+                colorsArray[i] = Math.random() * 0.7 + 0.3; // R
+                colorsArray[i + 1] = Math.random() * 0.7 + 0.3; // G
+                colorsArray[i + 2] = Math.random() * 0.7 + 0.3; // B
+            }
+
+            particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colorsArray, 3));
+
+            const particlesMaterial = new THREE.PointsMaterial({
+                size: 0.2,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.8
+            });
+
+            particles = new THREE.Points(particlesGeometry, particlesMaterial);
+            scene.add(particles);
+
+            // Secondary smaller particles (foreground)
+            const smallParticlesGeometry = new THREE.BufferGeometry();
+            const smallParticlesCount = 1000;
+            const smallPosArray = new Float32Array(smallParticlesCount * 3);
+            const smallColorsArray = new Float32Array(smallParticlesCount * 3);
+
+            for (let i = 0; i < smallParticlesCount * 3; i += 3) {
+                // Position - closer to camera
+                smallPosArray[i] = (Math.random() - 0.5) * 50;
+                smallPosArray[i + 1] = (Math.random() - 0.5) * 50;
+                smallPosArray[i + 2] = (Math.random() - 0.5) * 20;
+
+                // Color - pink/purple hues
+                smallColorsArray[i] = 0.8 + Math.random() * 0.2; // R (high)
+                smallColorsArray[i + 1] = 0.3 + Math.random() * 0.3; // G (medium)
+                smallColorsArray[i + 2] = 0.8 + Math.random() * 0.2; // B (high)
+            }
+
+            smallParticlesGeometry.setAttribute('position', new THREE.BufferAttribute(smallPosArray, 3));
+            smallParticlesGeometry.setAttribute('color', new THREE.BufferAttribute(smallColorsArray, 3));
+
+            const smallParticlesMaterial = new THREE.PointsMaterial({
+                size: 0.1,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.6
+            });
+
+            smallParticles = new THREE.Points(smallParticlesGeometry, smallParticlesMaterial);
+            scene.add(smallParticles);
+
+            // Background larger particles
+            const largeParticlesGeometry = new THREE.BufferGeometry();
+            const largeParticlesCount = 500;
+            const largePosArray = new Float32Array(largeParticlesCount * 3);
+            const largeColorsArray = new Float32Array(largeParticlesCount * 3);
+
+            for (let i = 0; i < largeParticlesCount * 3; i += 3) {
+                // Position - further from camera
+                largePosArray[i] = (Math.random() - 0.5) * 150;
+                largePosArray[i + 1] = (Math.random() - 0.5) * 150;
+                largePosArray[i + 2] = (Math.random() - 0.5) * 150 - 50; // Push back
+
+                // Color - blue/cyan hues
+                largeColorsArray[i] = 0.2 + Math.random() * 0.3; // R (low)
+                largeColorsArray[i + 1] = 0.5 + Math.random() * 0.5; // G (high)
+                largeColorsArray[i + 2] = 0.8 + Math.random() * 0.2; // B (high)
+            }
+
+            largeParticlesGeometry.setAttribute('position', new THREE.BufferAttribute(largePosArray, 3));
+            largeParticlesGeometry.setAttribute('color', new THREE.BufferAttribute(largeColorsArray, 3));
+
+            const largeParticlesMaterial = new THREE.PointsMaterial({
+                size: 0.4,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.5
+            });
+
+            largeParticles = new THREE.Points(largeParticlesGeometry, largeParticlesMaterial);
+            scene.add(largeParticles);
+        }
+
+        // Create floating 3D objects
+        function createFloatingObjects() {
+            // Create a group for all floating objects
+            floatingObjects = new THREE.Group();
+            scene.add(floatingObjects);
+
+            // Add a torus knot
+            const torusKnotGeometry = new THREE.TorusKnotGeometry(5, 1.5, 100, 16);
+            const torusKnotMaterial = new THREE.MeshNormalMaterial();
+            torusKnot = new THREE.Mesh(torusKnotGeometry, torusKnotMaterial);
+            torusKnot.position.set(-20, 10, -40);
+            floatingObjects.add(torusKnot);
+
+            // Add an icosahedron (20-sided polyhedron)
+            const icoGeometry = new THREE.IcosahedronGeometry(4, 0);
+            const icoMaterial = new THREE.MeshPhongMaterial({
+                color: 0x00ffff,
+                emissive: 0x111111,
+                specular: 0xffffff,
+                shininess: 100,
+                transparent: true,
+                opacity: 0.9
+            });
+            icosahedron = new THREE.Mesh(icoGeometry, icoMaterial);
+            icosahedron.position.set(25, -15, -30);
+            floatingObjects.add(icosahedron);
+
+            // Add a dodecahedron (12-sided polyhedron)
+            const dodecGeometry = new THREE.DodecahedronGeometry(3, 0);
+            const dodecMaterial = new THREE.MeshPhongMaterial({
+                color: 0xff3366,
+                emissive: 0x111111,
+                specular: 0xffffff,
+                shininess: 100,
+                transparent: true,
+                opacity: 0.9
+            });
+            dodecahedron = new THREE.Mesh(dodecGeometry, dodecMaterial);
+            dodecahedron.position.set(-15, -20, -25);
+            floatingObjects.add(dodecahedron);
+
+            // Add a floating resume document model
+            const resumeGeometry = new THREE.BoxGeometry(8, 10, 0.5);
+            const resumeMaterial = new THREE.MeshPhongMaterial({
+                color: 0xffffff,
+                emissive: 0x222222,
+                specular: 0xaaaaaa,
+                shininess: 30,
+                transparent: true,
+                opacity: 0.9
+            });
+            resumeModel = new THREE.Mesh(resumeGeometry, resumeMaterial);
+            resumeModel.position.set(15, 15, -35);
+            resumeModel.rotation.z = 0.2;
+            floatingObjects.add(resumeModel);
+
+            // Add lines on the resume
+            const linesMaterial = new THREE.MeshBasicMaterial({ color: 0x333333 });
+            for (let i = 0; i < 6; i++) {
+                const lineGeometry = new THREE.BoxGeometry(5, 0.2, 0.1);
+                const line = new THREE.Mesh(lineGeometry, linesMaterial);
+                line.position.set(0, 3 - i * 1.2, 0.3);
+                resumeModel.add(line);
+            }
+
+            // Add floating skill orbs
+            const skillOrbs = [];
+            const skillColors = [0x4f46e5, 0x60a5fa, 0xff3366, 0xff9933, 0x10b981];
+            const skillNames = ['JavaScript', 'React', 'Node.js', 'Python', 'AWS'];
+
+            for (let i = 0; i < 5; i++) {
+                const orbGeometry = new THREE.SphereGeometry(1.2, 32, 32);
+                const orbMaterial = new THREE.MeshPhongMaterial({
+                    color: skillColors[i],
+                    emissive: 0x111111,
+                    specular: 0xffffff,
+                    shininess: 100,
+                    transparent: true,
+                    opacity: 0.8
+                });
+
+                const orb = new THREE.Mesh(orbGeometry, orbMaterial);
+                const angle = (i / 5) * Math.PI * 2;
+                const radius = 25;
+                orb.position.set(
+                    Math.cos(angle) * radius,
+                    Math.sin(angle) * radius,
+                    -50
+                );
+                orb.userData = { name: skillNames[i], type: 'skill', index: i };
+                skillOrbs.push(orb);
+                floatingObjects.add(orb);
+            }
+
+            // Add a 3D career path
+            createCareerPath();
+        }
+
+        // Create a 3D career path visualization
+        function createCareerPath() {
+            // Create a curved path for the career trajectory
+            const pathPoints = [];
+            const numPoints = 50;
+
+            for (let i = 0; i < numPoints; i++) {
+                const t = i / (numPoints - 1);
+                // Create a curved path using parametric equations
+                const x = 30 * Math.cos(t * Math.PI * 2) - 40;
+                const y = 10 * Math.sin(t * Math.PI * 2) - 30;
+                const z = -50 - t * 20;
+
+                pathPoints.push(new THREE.Vector3(x, y, z));
+            }
+
+            // Create a tube geometry along the path
+            const pathCurve = new THREE.CatmullRomCurve3(pathPoints);
+            const tubeGeometry = new THREE.TubeGeometry(pathCurve, 100, 0.3, 8, false);
+            const tubeMaterial = new THREE.MeshPhongMaterial({
+                color: 0x4f46e5,
+                emissive: 0x222222,
+                specular: 0xffffff,
+                shininess: 30,
+                transparent: true,
+                opacity: 0.7
+            });
+
+            const tube = new THREE.Mesh(tubeGeometry, tubeMaterial);
+            floatingObjects.add(tube);
+
+            // Add milestone nodes along the path
+            const milestones = [
+                { position: 0, name: 'Entry Level' },
+                { position: 0.15, name: 'Junior Developer' },
+                { position: 0.3, name: 'Mid-level Developer' },
+                { position: 0.45, name: 'Senior Developer' },
+                { position: 0.6, name: 'Team Lead' },
+                { position: 0.75, name: 'Engineering Manager' },
+                { position: 0.9, name: 'CTO' }
+            ];
+
+            milestones.forEach((milestone, index) => {
+                const point = pathCurve.getPoint(milestone.position);
+
+                // Create a sphere at each milestone
+                const nodeGeometry = new THREE.SphereGeometry(0.8, 16, 16);
+                const nodeMaterial = new THREE.MeshPhongMaterial({
+                    color: index < 3 ? 0x60a5fa : 0x10b981, // Past vs future
+                    emissive: 0x111111,
+                    specular: 0xffffff,
+                    shininess: 100
+                });
+
+                const node = new THREE.Mesh(nodeGeometry, nodeMaterial);
+                node.position.copy(point);
+                node.userData = { name: milestone.name, type: 'milestone', index: index };
+                floatingObjects.add(node);
+            });
+        }
+
+        // Animation time tracking
+        let time = 0;
+
+        // Global variables for raycasting and object interaction
+        let raycaster, mouse;
+        let hoveredObject = null;
+        let selectedObject = null;
+        let objectInfoPanel = null;
+
+        // Initialize raycasting for object interaction
+        function initRaycasting() {
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            // Create an info panel for displaying object information
+            objectInfoPanel = document.createElement('div');
+            objectInfoPanel.className = 'glass p-3 absolute hidden';
+            objectInfoPanel.style.zIndex = '1000';
+            objectInfoPanel.style.minWidth = '200px';
+            objectInfoPanel.style.pointerEvents = 'none';
+            document.body.appendChild(objectInfoPanel);
+
+            // Add event listeners for mouse interaction
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('click', onMouseClick);
+        }
+
+        // Handle mouse movement for object hovering
+        function onMouseMove(event) {
+            // Calculate mouse position in normalized device coordinates
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            // Update the info panel position
+            objectInfoPanel.style.left = `${event.clientX + 15}px`;
+            objectInfoPanel.style.top = `${event.clientY + 15}px`;
+
+            // Store the global mouse position for camera movement
+            mouseX = event.clientX - window.innerWidth / 2;
+            mouseY = event.clientY - window.innerHeight / 2;
+        }
+
+        // Handle mouse clicks for object selection
+        function onMouseClick(event) {
+            if (hoveredObject) {
+                selectedObject = hoveredObject;
+
+                // Handle different types of objects
+                if (selectedObject.userData && selectedObject.userData.type === 'milestone') {
+                    // Show career milestone details
+                    document.getElementById('position-title').textContent = selectedObject.userData.name;
+                    document.getElementById('position-date').textContent =
+                        selectedObject.userData.index < 3 ? 'Past/Present' : 'Future Path';
+                    document.getElementById('position-description').textContent =
+                        `This is a ${selectedObject.userData.name} position in your career journey.`;
+
+                    // Unlock the career explorer achievement
+                    achievementSystem.unlockAchievement('career_explorer');
+                }
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.01;
+
+            // Rotate main particles
+            particles.rotation.x += 0.0003;
+            particles.rotation.y += 0.0005;
+
+            // Rotate small particles in different direction
+            if (smallParticles) {
+                smallParticles.rotation.x -= 0.0004;
+                smallParticles.rotation.z += 0.0006;
+            }
+
+            // Rotate large particles slowly
+            if (largeParticles) {
+                largeParticles.rotation.y += 0.0002;
+                largeParticles.rotation.z -= 0.0001;
+            }
+
+            // Mouse interaction - more responsive
+            particles.rotation.x += (mouseY * 0.00008);
+            particles.rotation.y += (mouseX * 0.00008);
+
+            if (smallParticles) {
+                smallParticles.rotation.x -= (mouseY * 0.00012);
+                smallParticles.rotation.y -= (mouseX * 0.00012);
+            }
+
+            // Animate floating objects
+            if (floatingObjects) {
+                // Gentle floating motion
+                floatingObjects.position.y = Math.sin(time * 0.5) * 2;
+
+                // Rotate individual objects
+                if (torusKnot) {
+                    torusKnot.rotation.x += 0.01;
+                    torusKnot.rotation.y += 0.01;
+                }
+
+                if (icosahedron) {
+                    icosahedron.rotation.x += 0.005;
+                    icosahedron.rotation.y += 0.007;
+                }
+
+                if (dodecahedron) {
+                    dodecahedron.rotation.x += 0.007;
+                    dodecahedron.rotation.z += 0.005;
+                }
+
+                // Animate the resume model
+                if (resumeModel) {
+                    resumeModel.rotation.y = Math.sin(time * 0.3) * 0.2;
+                    resumeModel.rotation.x = Math.cos(time * 0.5) * 0.1;
+                }
+
+                // Animate skill orbs
+                floatingObjects.children.forEach(child => {
+                    if (child.userData && child.userData.type === 'skill') {
+                        const i = child.userData.index;
+                        // Make each orb move in a unique pattern
+                        child.position.y += Math.sin(time * 0.5 + i) * 0.03;
+                        child.rotation.y += 0.01;
+                        child.rotation.x += 0.005;
+
+                        // Pulse effect for hovered objects
+                        if (hoveredObject === child) {
+                            child.scale.set(1.2, 1.2, 1.2);
+                        } else {
+                            child.scale.set(1, 1, 1);
+                        }
+                    }
+
+                    // Animate career milestone nodes
+                    if (child.userData && child.userData.type === 'milestone') {
+                        // Pulse effect for milestone nodes
+                        const pulseScale = 1 + Math.sin(time * 3 + child.userData.index) * 0.1;
+                        child.scale.set(pulseScale, pulseScale, pulseScale);
+
+                        // Highlight hovered or selected nodes
+                        if (hoveredObject === child || selectedObject === child) {
+                            child.material.emissive.setHex(0x333333);
+                            child.scale.set(1.3, 1.3, 1.3);
+                        } else {
+                            child.material.emissive.setHex(0x111111);
+                        }
+                    }
+                });
+            }
+
+            // Handle raycasting for object interaction
+            if (raycaster && mouse) {
+                raycaster.setFromCamera(mouse, camera);
+
+                // Find intersected objects
+                const intersects = raycaster.intersectObjects(scene.children, true);
+
+                // Reset previously hovered object
+                if (hoveredObject && (!intersects.length || intersects[0].object !== hoveredObject)) {
+                    // Hide info panel when not hovering over an object
+                    objectInfoPanel.classList.add('hidden');
+                    hoveredObject = null;
+                }
+
+                // Handle new hover
+                if (intersects.length > 0) {
+                    const object = intersects[0].object;
+
+                    // Only process objects with userData
+                    if (object.userData && (object.userData.type === 'skill' || object.userData.type === 'milestone')) {
+                        hoveredObject = object;
+
+                        // Show info panel with object details
+                        objectInfoPanel.innerHTML = `
+                            <h4 class="font-medium text-white">${object.userData.name}</h4>
+                            <p class="text-sm text-gray-300">${object.userData.type === 'skill' ? 'Skill' : 'Career Position'}</p>
+                        `;
+                        objectInfoPanel.classList.remove('hidden');
+
+                        // Change cursor to pointer
+                        document.body.style.cursor = 'pointer';
+                    } else {
+                        document.body.style.cursor = 'default';
+                    }
+                } else {
+                    document.body.style.cursor = 'default';
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // Mouse movement tracking
+        let mouseX = 0;
+        let mouseY = 0;
+
+        document.addEventListener('mousemove', (event) => {
+            mouseX = event.clientX - window.innerWidth / 2;
+            mouseY = event.clientY - window.innerHeight / 2;
+        });
+
+        // Initialize 3D background
+        initThreeJS();
+
+        // Initialize raycasting for object interaction
+        initRaycasting();
+
+        // Make sure all DOM elements are loaded before setting up the achievement system
+        // Function to analyze resume using the backend server
+        async function analyzeResumeWithBackend(file) {
+            try {
+                console.log('Sending resume to backend server for analysis...');
+                console.log('Backend URL:', BACKEND_URL);
+                console.log('File details:', { name: file.name, type: file.type, size: file.size });
+
+                // Create form data to send the file
+                const formData = new FormData();
+                formData.append('resume', file);
+
+                // Log the form data
+                console.log('Form data created with file:', file.name);
+
+                try {
+                    // Send the file to the backend server
+                    console.log('Sending fetch request to:', `${BACKEND_URL}/api/analyze-resume`);
+                    const response = await fetch(`${BACKEND_URL}/api/analyze-resume`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    console.log('Response received:', response.status, response.statusText);
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('Backend server error:', response.status, errorText);
+                        return null;
+                    }
+
+                    // Parse the response
+                    const analysisResult = await response.json();
+                    console.log('Analysis result received from backend:', analysisResult);
+
+                    return analysisResult;
+                } catch (fetchError) {
+                    console.error('Fetch error:', fetchError);
+
+                    // Try with a different approach as fallback
+                    console.log('Trying XMLHttpRequest as fallback...');
+
+                    return new Promise((resolve, reject) => {
+                        const xhr = new XMLHttpRequest();
+                        xhr.open('POST', `${BACKEND_URL}/api/analyze-resume`);
+
+                        xhr.onload = function() {
+                            if (xhr.status >= 200 && xhr.status < 300) {
+                                console.log('XHR successful, status:', xhr.status);
+                                try {
+                                    const result = JSON.parse(xhr.responseText);
+                                    resolve(result);
+                                } catch (parseError) {
+                                    console.error('Error parsing XHR response:', parseError);
+                                    reject(parseError);
+                                }
+                            } else {
+                                console.error('XHR error:', xhr.status, xhr.statusText, xhr.responseText);
+                                reject(new Error(`XHR failed: ${xhr.status} ${xhr.statusText}`));
+                            }
+                        };
+
+                        xhr.onerror = function() {
+                            console.error('XHR network error');
+                            reject(new Error('Network error'));
+                        };
+
+                        xhr.send(formData);
+                    });
+                }
+            } catch (error) {
+                console.error('Error calling backend server:', error);
+                return null;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Log that we're using the backend server
+            console.log('Using backend server at:', BACKEND_URL);
+            // Achievement System
+            const achievementSystem = {
+            achievements: [
+                {
+                    id: 'welcome',
+                    title: 'Welcome!',
+                    description: 'Started your resume journey',
+                    icon: '👋',
+                    unlocked: false
+                },
+                {
+                    id: 'chat_started',
+                    title: 'Conversation Starter',
+                    description: 'Started a chat with the Career Assistant',
+                    icon: '💬',
+                    unlocked: false
+                },
+                {
+                    id: 'resume_uploaded',
+                    title: 'Resume Uploaded',
+                    description: 'Uploaded your resume for analysis',
+                    icon: '📄',
+                    unlocked: false
+                },
+                {
+                    id: 'analysis_viewed',
+                    title: 'Analysis Explorer',
+                    description: 'Viewed your resume analysis results',
+                    icon: '🔍',
+                    unlocked: false
+                },
+                {
+                    id: 'data_visualization',
+                    title: 'Data Visualizer',
+                    description: 'Explored interactive data visualizations',
+                    icon: '📊',
+                    unlocked: false
+                },
+                {
+                    id: 'career_explorer',
+                    title: 'Career Explorer',
+                    description: 'Visualized your career journey timeline',
+                    icon: '📈',
+                    unlocked: false
+                },
+                {
+                    id: 'career_advice',
+                    title: 'Career Curious',
+                    description: 'Asked for career advice',
+                    icon: '🚀',
+                    unlocked: false
+                },
+                {
+                    id: 'resume_tips',
+                    title: 'Resume Expert',
+                    description: 'Learned about resume optimization',
+                    icon: '✨',
+                    unlocked: false
+                },
+                {
+                    id: 'interview_prep',
+                    title: 'Interview Ready',
+                    description: 'Prepared for interviews with our tips',
+                    icon: '🎯',
+                    unlocked: false
+                }
+            ],
+
+            unlockedCount: 0,
+
+            init: function() {
+                // Unlock the welcome achievement automatically
+                setTimeout(() => {
+                    this.unlockAchievement('welcome');
+                }, 2000);
+
+                // Set up event listeners
+                chatBubble.addEventListener('click', () => {
+                    this.unlockAchievement('chat_started');
+                });
+
+                fileInput.addEventListener('change', () => {
+                    this.unlockAchievement('resume_uploaded');
+                });
+
+                // Check for career-related keywords in chat
+                chatInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        const message = chatInput.value.toLowerCase();
+
+                        if (message.includes('career') || message.includes('job') ||
+                            message.includes('profession') || message.includes('work')) {
+                            this.unlockAchievement('career_advice');
+                        }
+
+                        if (message.includes('resume') || message.includes('cv')) {
+                            this.unlockAchievement('resume_tips');
+                        }
+
+                        if (message.includes('interview')) {
+                            this.unlockAchievement('interview_prep');
+                        }
+                    }
+                });
+
+                // Achievement badge click handler
+                document.getElementById('achievements-badge').addEventListener('click', () => {
+                    // Show all unlocked achievements
+                    this.achievements.forEach(achievement => {
+                        if (achievement.unlocked) {
+                            this.showAchievementNotification(achievement, false);
+                        }
+                    });
+                });
+            },
+
+            unlockAchievement: function(id) {
+                const achievement = this.achievements.find(a => a.id === id);
+
+                if (achievement && !achievement.unlocked) {
+                    achievement.unlocked = true;
+                    this.unlockedCount++;
+
+                    // Update the counter
+                    document.getElementById('achievements-count').textContent = this.unlockedCount;
+
+                    // Show notification
+                    this.showAchievementNotification(achievement, true);
+
+                    // Save to localStorage
+                    this.saveProgress();
+                }
+            },
+
+            showAchievementNotification: function(achievement, autoHide = true) {
+                // Create achievement element
+                const achievementEl = document.createElement('div');
+                achievementEl.className = 'achievement';
+                achievementEl.innerHTML = `
+                    <div class="achievement-icon">${achievement.icon}</div>
+                    <div class="achievement-content">
+                        <h3 class="achievement-title">${achievement.title}</h3>
+                        <p class="achievement-description">${achievement.description}</p>
+                        <div class="achievement-progress">
+                            <div class="achievement-progress-bar"></div>
+                        </div>
+                    </div>
+                `;
+
+                // Add to container
+                const container = document.getElementById('achievement-container');
+                container.appendChild(achievementEl);
+
+                // Trigger animation
+                setTimeout(() => {
+                    achievementEl.classList.add('show');
+                    const progressBar = achievementEl.querySelector('.achievement-progress-bar');
+                    progressBar.style.width = '100%';
+                }, 100);
+
+                // Remove after delay if autoHide is true
+                if (autoHide) {
+                    setTimeout(() => {
+                        achievementEl.classList.remove('show');
+                        setTimeout(() => {
+                            container.removeChild(achievementEl);
+                        }, 500);
+                    }, 5000);
+                }
+            },
+
+            saveProgress: function() {
+                try {
+                    localStorage.setItem('resumeAchievements', JSON.stringify({
+                        achievements: this.achievements,
+                        unlockedCount: this.unlockedCount
+                    }));
+                } catch (e) {
+                    console.log('Could not save achievements to localStorage');
+                }
+            },
+
+            loadProgress: function() {
+                try {
+                    const saved = JSON.parse(localStorage.getItem('resumeAchievements'));
+                    if (saved) {
+                        this.achievements = saved.achievements;
+                        this.unlockedCount = saved.unlockedCount;
+                        document.getElementById('achievements-count').textContent = this.unlockedCount;
+                    }
+                } catch (e) {
+                    console.log('Could not load achievements from localStorage');
+                }
+            }
+        };
+
+        // Initialize achievement system
+        achievementSystem.loadProgress();
+        achievementSystem.init();
+        });
+
+        // Set up event listeners for DOM elements
+
+        // Upload functionality
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', handleFileUpload);
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#60a5fa';
+            uploadArea.style.background = 'rgba(96, 165, 250, 0.1)';
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+            uploadArea.style.background = 'transparent';
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+            uploadArea.style.background = 'transparent';
+
+            if (e.dataTransfer.files.length) {
+                handleFileUpload({ target: { files: e.dataTransfer.files } });
+            }
+        });
+
+        backButton.addEventListener('click', () => {
+            resultsSection.classList.add('hidden');
+            uploadSection.classList.remove('hidden');
+        });
+
+        async function handleFileUpload(event) {
+            if (event.target.files.length === 0) return;
+
+            const file = event.target.files[0];
+            console.log('File selected:', file.name);
+
+            // Show loading
+            uploadSection.classList.add('hidden');
+            loadingSection.classList.remove('hidden');
+
+            try {
+                // Send file to backend for analysis
+                console.log('Sending file to backend server...');
+                const analysisResult = await analyzeResumeWithBackend(file);
+                console.log('Analysis result:', analysisResult);
+
+                // Hide loading
+                loadingSection.classList.add('hidden');
+
+                // Show results
+                resultsSection.classList.remove('hidden');
+
+                if (analysisResult) {
+                    // Populate with real analysis data from backend
+                    console.log('Using backend analysis results');
+                    populateResultsFromGemini(analysisResult);
+                } else {
+                    // Fallback to mock data if backend analysis failed
+                    console.log('Falling back to mock data');
+                    populateResults();
+                }
+
+                // Force a resize event to ensure canvas elements are properly sized
+                window.dispatchEvent(new Event('resize'));
+
+                // Add a small delay to ensure DOM is fully rendered before initializing visualizations
+                setTimeout(() => {
+                    // Force redraw of timeline canvas
+                    const timelineCanvas = document.getElementById('timeline-canvas');
+                    if (timelineCanvas) {
+                        console.log('Forcing timeline canvas redraw');
+                        const ctx = timelineCanvas.getContext('2d');
+                        const container = document.getElementById('timeline-container');
+                        if (container && ctx) {
+                            timelineCanvas.width = container.clientWidth;
+                            timelineCanvas.height = Math.max(container.clientHeight, 200);
+                            // This will trigger a redraw if the timeline visualization is already initialized
+                            window.dispatchEvent(new Event('resize'));
+                        }
+                    }
+                }, 500);
+
+                // Unlock the analysis viewed achievement
+                achievementSystem.unlockAchievement('analysis_viewed');
+
+            } catch (error) {
+                console.error('Error processing resume:', error);
+
+                // Hide loading
+                loadingSection.classList.add('hidden');
+
+                // Show results with mock data as fallback
+                resultsSection.classList.remove('hidden');
+                populateResults();
+
+                // Force resize for visualizations
+                window.dispatchEvent(new Event('resize'));
+            }
+        }
+
+        // Function to populate results from Gemini API analysis
+        function populateResultsFromGemini(analysisResult) {
+            // Clear previous results
+            jobList.innerHTML = '';
+            skillList.innerHTML = '';
+            improvementList.innerHTML = '';
+
+            // Populate job recommendations
+            if (analysisResult.jobs && analysisResult.jobs.length > 0) {
+                analysisResult.jobs.forEach(job => {
+                    const jobItem = document.createElement('div');
+                    jobItem.className = 'bg-gray-800 bg-opacity-50 rounded-lg p-4';
+                    jobItem.innerHTML = `
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="font-medium">${job.title}</h4>
+                            <span class="text-sm px-2 py-1 bg-blue-500 bg-opacity-30 rounded-full">${job.match}% Match</span>
+                        </div>
+                        <p class="text-sm text-gray-300">${job.description}</p>
+                    `;
+                    jobList.appendChild(jobItem);
+                });
+            }
+
+            // Create industry match radar chart with real data
+            if (analysisResult.industryMatch) {
+                createIndustryRadarChartFromData(analysisResult.industryMatch);
+            } else {
+                createIndustryRadarChart(); // Fallback to mock data
+            }
+
+            // Create resume score visualization with real data
+            if (analysisResult.resumeScore) {
+                createResumeScoreVisualizationFromData(analysisResult.resumeScore);
+            } else {
+                createResumeScoreVisualization(); // Fallback to mock data
+            }
+
+            // Create skill comparison visualization with real data
+            if (analysisResult.skillComparisons && analysisResult.skillComparisons.length > 0) {
+                createSkillComparisonVisualizationFromData(analysisResult.skillComparisons);
+            } else {
+                createSkillComparisonVisualization(); // Fallback to mock data
+            }
+
+            // Create career timeline visualization with real data
+            if (analysisResult.careerPath && analysisResult.careerPath.length > 0) {
+                createCareerTimelineVisualizationFromData(analysisResult.careerPath);
+            } else {
+                createCareerTimelineVisualization(); // Fallback to mock data
+            }
+
+            // Populate skill gaps
+            if (analysisResult.skills && analysisResult.skills.length > 0) {
+                analysisResult.skills.forEach(skill => {
+                    const skillItem = document.createElement('div');
+                    skillItem.className = 'bg-gray-800 bg-opacity-50 rounded-lg p-4';
+
+                    // Create stars for importance
+                    let starsHtml = '';
+                    for (let i = 0; i < 5; i++) {
+                        const filled = i < skill.importance;
+                        starsHtml += `
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ${filled ? 'text-yellow-400' : 'text-gray-600'}" fill="${filled ? 'currentColor' : 'none'}" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                            </svg>
+                        `;
+                    }
+
+                    skillItem.innerHTML = `
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="font-medium">${skill.name}</h4>
+                            <div class="flex">${starsHtml}</div>
+                        </div>
+                        <p class="text-sm text-gray-300">${skill.description}</p>
+                    `;
+                    skillList.appendChild(skillItem);
+                });
+            }
+
+            // Populate improvements
+            if (analysisResult.improvements && analysisResult.improvements.length > 0) {
+                analysisResult.improvements.forEach(improvement => {
+                    const improvementItem = document.createElement('div');
+                    improvementItem.className = 'flex items-start';
+                    improvementItem.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-400 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p class="text-gray-300">${improvement}</p>
+                    `;
+                    improvementList.appendChild(improvementItem);
+                });
+            }
+
+            // LinkedIn bio
+            if (analysisResult.linkedinBio) {
+                linkedinBio.textContent = analysisResult.linkedinBio;
+            }
+
+            // Unlock data visualization achievement
+            setTimeout(() => {
+                achievementSystem.unlockAchievement('data_visualization');
+            }, 2000);
+        }
+
+        // Store chart instances to destroy them before creating new ones
+        let charts = {
+            industryRadar: null,
+            skillComparison: null,
+            resumeScore: null,
+            careerTimeline: null
+        };
+
+        // Helper function for industry radar chart with real data
+        function createIndustryRadarChartFromData(industryMatch) {
+            const canvas = document.getElementById('industry-radar-chart');
+            const ctx = canvas.getContext('2d');
+
+            // Destroy existing chart if it exists
+            if (charts.industryRadar) {
+                charts.industryRadar.destroy();
+            }
+
+            // Extract data from the analysis result
+            const labels = Object.keys(industryMatch).map(key =>
+                key.charAt(0).toUpperCase() + key.slice(1) // Capitalize first letter
+            );
+            const data = Object.values(industryMatch);
+
+            // Industry match data
+            const chartData = {
+                labels: labels,
+                datasets: [{
+                    label: 'Your Profile Match',
+                    data: data,
+                    fill: true,
+                    backgroundColor: 'rgba(96, 165, 250, 0.2)',
+                    borderColor: 'rgba(96, 165, 250, 1)',
+                    pointBackgroundColor: 'rgba(96, 165, 250, 1)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgba(96, 165, 250, 1)'
+                }]
+            };
+
+            // Chart configuration
+            const config = {
+                type: 'radar',
+                data: chartData,
+                options: {
+                    elements: {
+                        line: {
+                            borderWidth: 3
+                        }
+                    },
+                    scales: {
+                        r: {
+                            angleLines: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            pointLabels: {
+                                color: 'rgba(255, 255, 255, 0.7)',
+                                font: {
+                                    size: 12
+                                }
+                            },
+                            ticks: {
+                                backdropColor: 'transparent',
+                                color: 'rgba(255, 255, 255, 0.5)'
+                            },
+                            suggestedMin: 0,
+                            suggestedMax: 100
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            };
+
+            // Create the chart with animation
+            charts.industryRadar = new Chart(ctx, config);
+
+            // Animate the chart data
+            setTimeout(() => {
+                charts.industryRadar.update();
+            }, 500);
+        }
+
+        // Helper function for resume score visualization with real data
+        function createResumeScoreVisualizationFromData(resumeScore) {
+            // Resume score (out of 100)
+            const score = resumeScore.overall || 78;
+
+            // Update score display
+            document.getElementById('resume-score').textContent = score;
+
+            // Animate score bar
+            setTimeout(() => {
+                document.getElementById('score-bar').style.width = `${score}%`;
+            }, 300);
+
+            // Component scores
+            const atsScore = resumeScore.ats || 85;
+            const impactScore = resumeScore.impact || 70;
+            const keywordScore = resumeScore.keyword || 82;
+            const readabilityScore = resumeScore.readability || 75;
+
+            // Update component scores
+            setTimeout(() => {
+                document.getElementById('ats-score').textContent = `${atsScore}%`;
+                document.getElementById('ats-bar').style.width = `${atsScore}%`;
+
+                document.getElementById('impact-score').textContent = `${impactScore}%`;
+                document.getElementById('impact-bar').style.width = `${impactScore}%`;
+
+                document.getElementById('keyword-score').textContent = `${keywordScore}%`;
+                document.getElementById('keyword-bar').style.width = `${keywordScore}%`;
+
+                document.getElementById('readability-score').textContent = `${readabilityScore}%`;
+                document.getElementById('readability-bar').style.width = `${readabilityScore}%`;
+            }, 600);
+        }
+
+        // Helper function for skill comparison visualization with real data
+        function createSkillComparisonVisualizationFromData(skillComparisons) {
+            const skillComparisonContainer = document.getElementById('skill-comparison-container');
+
+            // Clear container
+            skillComparisonContainer.innerHTML = '';
+
+            // Create skill comparison bars
+            skillComparisons.forEach(skill => {
+                const skillItem = document.createElement('div');
+
+                skillItem.innerHTML = `
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-medium">${skill.name}</span>
+                        <div class="flex space-x-4">
+                            <span class="text-sm text-blue-400">You: ${skill.yourLevel}%</span>
+                            <span class="text-sm text-pink-400">Required: ${skill.requiredLevel}%</span>
+                        </div>
+                    </div>
+                    <div class="h-6 bg-gray-800 rounded-full overflow-hidden relative">
+                        <div class="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-600 to-blue-400 opacity-70 skill-your-level" style="width: 0%"></div>
+                        <div class="absolute top-0 left-0 h-full w-1 bg-pink-500 skill-required-level" style="left: 0%"></div>
+                    </div>
+                `;
+
+                skillComparisonContainer.appendChild(skillItem);
+            });
+
+            // Animate skill comparison bars
+            setTimeout(() => {
+                const yourLevelBars = document.querySelectorAll('.skill-your-level');
+                const requiredLevelMarkers = document.querySelectorAll('.skill-required-level');
+
+                skillComparisons.forEach((skill, index) => {
+                    yourLevelBars[index].style.width = `${skill.yourLevel}%`;
+                    requiredLevelMarkers[index].style.left = `${skill.requiredLevel}%`;
+                });
+            }, 300);
+        }
+
+        // Helper function for career timeline visualization with real data
+        function createCareerTimelineVisualizationFromData(careerPath) {
+            // Use the existing career timeline visualization function
+            // but pass in the real career path data
+            createCareerTimelineVisualization(careerPath);
+        }
+
+        function populateResults() {
+            // Clear previous results
+            jobList.innerHTML = '';
+            skillList.innerHTML = '';
+            improvementList.innerHTML = '';
+
+            // Mock job recommendations
+            const jobs = [
+                { title: 'Senior Software Engineer', match: 95, description: 'Your experience with full-stack development and leadership makes you a strong candidate for senior software engineering roles.' },
+                { title: 'DevOps Engineer', match: 88, description: 'Your skills in CI/CD, cloud infrastructure, and automation align well with DevOps positions.' },
+                { title: 'Technical Lead', match: 82, description: 'Your combination of technical expertise and team leadership experience makes you suitable for technical lead roles.' },
+                { title: 'Solutions Architect', match: 78, description: 'Your broad technical knowledge and system design experience would be valuable in an architect role.' }
+            ];
+
+            jobs.forEach(job => {
+                const jobItem = document.createElement('div');
+                jobItem.className = 'bg-gray-800 bg-opacity-50 rounded-lg p-4';
+                jobItem.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="font-medium">${job.title}</h4>
+                        <span class="text-sm px-2 py-1 bg-blue-500 bg-opacity-30 rounded-full">${job.match}% Match</span>
+                    </div>
+                    <p class="text-sm text-gray-300">${job.description}</p>
+                `;
+                jobList.appendChild(jobItem);
+            });
+
+            // Create industry match radar chart
+            createIndustryRadarChart();
+
+            // Create resume score visualization
+            createResumeScoreVisualization();
+
+            // Create skill comparison visualization
+            createSkillComparisonVisualization();
+
+            // Create career timeline visualization
+            createCareerTimelineVisualization();
+
+            // Unlock data visualization achievement
+            setTimeout(() => {
+                achievementSystem.unlockAchievement('data_visualization');
+            }, 2000);
+
+            // Mock skill gaps
+            const skills = [
+                { name: 'Kubernetes', importance: 5, description: 'Container orchestration is increasingly important for scalable applications.' },
+                { name: 'Machine Learning', importance: 4, description: 'Basic ML knowledge is becoming valuable across many engineering roles.' },
+                { name: 'GraphQL', importance: 3, description: 'Modern API development often leverages GraphQL for flexible data fetching.' }
+            ];
+
+            skills.forEach(skill => {
+                const skillItem = document.createElement('div');
+                skillItem.className = 'bg-gray-800 bg-opacity-50 rounded-lg p-4';
+
+                // Create stars for importance
+                let starsHtml = '';
+                for (let i = 0; i < 5; i++) {
+                    const filled = i < skill.importance;
+                    starsHtml += `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ${filled ? 'text-yellow-400' : 'text-gray-600'}" fill="${filled ? 'currentColor' : 'none'}" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                        </svg>
+                    `;
+                }
+
+                skillItem.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="font-medium">${skill.name}</h4>
+                        <div class="flex">${starsHtml}</div>
+                    </div>
+                    <p class="text-sm text-gray-300">${skill.description}</p>
+                `;
+                skillList.appendChild(skillItem);
+            });
+
+            // Mock improvements
+            const improvements = [
+                'Quantify your achievements with specific metrics (e.g., "Reduced page load time by 40%" instead of "Improved performance")',
+                'Add a skills section that clearly lists your technical competencies',
+                'Include specific examples of problems you solved and their business impact',
+                'Tailor your resume for each job application by emphasizing relevant experience',
+                'Consider adding a brief summary section at the top to highlight your key qualifications'
+            ];
+
+            improvements.forEach(improvement => {
+                const improvementItem = document.createElement('div');
+                improvementItem.className = 'flex items-start';
+                improvementItem.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-400 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p class="text-gray-300">${improvement}</p>
+                `;
+                improvementList.appendChild(improvementItem);
+            });
+
+            // LinkedIn bio
+            linkedinBio.textContent = `Experienced Software Engineer with 5+ years of expertise in full-stack development. Passionate about building scalable, user-friendly applications using React, Node.js, and cloud technologies. Proven track record of leading teams to deliver high-quality software solutions on time and within budget. Constantly learning and adapting to new technologies to solve complex problems efficiently.`;
+        }
+
+        // Create industry match radar chart
+        function createIndustryRadarChart(industryMatch) {
+            const canvas = document.getElementById('industry-radar-chart');
+            const ctx = canvas.getContext('2d');
+
+            // Destroy existing chart if it exists
+            if (charts.industryRadar) {
+                charts.industryRadar.destroy();
+            }
+
+            // Use provided industry match data or default if not available
+            const industries = industryMatch || {
+                tech: 85,
+                finance: 65,
+                healthcare: 45,
+                marketing: 70,
+                education: 60,
+                manufacturing: 50
+            };
+
+            // Convert industry match object to arrays for the chart
+            const labels = Object.keys(industries).map(key => key.charAt(0).toUpperCase() + key.slice(1));
+            const values = Object.values(industries);
+
+            // Industry match data
+            const data = {
+                labels: labels,
+                datasets: [{
+                    label: 'Your Profile Match',
+                    data: values,
+                    fill: true,
+                    backgroundColor: 'rgba(96, 165, 250, 0.2)',
+                    borderColor: 'rgba(96, 165, 250, 1)',
+                    pointBackgroundColor: 'rgba(96, 165, 250, 1)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgba(96, 165, 250, 1)'
+                }]
+            };
+
+            // Chart configuration
+            const config = {
+                type: 'radar',
+                data: data,
+                options: {
+                    elements: {
+                        line: {
+                            borderWidth: 3
+                        }
+                    },
+                    scales: {
+                        r: {
+                            angleLines: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            pointLabels: {
+                                color: 'rgba(255, 255, 255, 0.7)',
+                                font: {
+                                    size: 12
+                                }
+                            },
+                            ticks: {
+                                backdropColor: 'transparent',
+                                color: 'rgba(255, 255, 255, 0.5)'
+                            },
+                            suggestedMin: 0,
+                            suggestedMax: 100
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            };
+
+            // Create the chart with animation
+            charts.industryRadar = new Chart(ctx, config);
+
+            // Animate the chart data
+            setTimeout(() => {
+                charts.industryRadar.data.datasets[0].data = [85, 65, 45, 70, 60, 50];
+                charts.industryRadar.update();
+            }, 500);
+        }
+
+        // Create resume score visualization
+        function createResumeScoreVisualization() {
+            // Resume score (out of 100)
+            const score = 78;
+
+            // Update score display
+            document.getElementById('resume-score').textContent = score;
+
+            // Animate score bar
+            setTimeout(() => {
+                document.getElementById('score-bar').style.width = `${score}%`;
+            }, 300);
+
+            // Component scores
+            const atsScore = 85;
+            const impactScore = 70;
+            const keywordScore = 82;
+            const readabilityScore = 75;
+
+            // Update component scores
+            setTimeout(() => {
+                document.getElementById('ats-score').textContent = `${atsScore}%`;
+                document.getElementById('ats-bar').style.width = `${atsScore}%`;
+
+                document.getElementById('impact-score').textContent = `${impactScore}%`;
+                document.getElementById('impact-bar').style.width = `${impactScore}%`;
+
+                document.getElementById('keyword-score').textContent = `${keywordScore}%`;
+                document.getElementById('keyword-bar').style.width = `${keywordScore}%`;
+
+                document.getElementById('readability-score').textContent = `${readabilityScore}%`;
+                document.getElementById('readability-bar').style.width = `${readabilityScore}%`;
+            }, 600);
+        }
+
+        // Create skill comparison visualization
+        function createSkillComparisonVisualization() {
+            const skillComparisonContainer = document.getElementById('skill-comparison-container');
+
+            // Skill comparison data
+            const skillComparisons = [
+                { name: 'JavaScript', yourLevel: 90, requiredLevel: 80 },
+                { name: 'React', yourLevel: 85, requiredLevel: 75 },
+                { name: 'Node.js', yourLevel: 80, requiredLevel: 70 },
+                { name: 'DevOps', yourLevel: 60, requiredLevel: 75 },
+                { name: 'Cloud Services', yourLevel: 65, requiredLevel: 80 }
+            ];
+
+            // Clear container
+            skillComparisonContainer.innerHTML = '';
+
+            // Create skill comparison bars
+            skillComparisons.forEach(skill => {
+                const skillItem = document.createElement('div');
+
+                skillItem.innerHTML = `
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-medium">${skill.name}</span>
+                        <div class="flex space-x-4">
+                            <span class="text-sm text-blue-400">You: ${skill.yourLevel}%</span>
+                            <span class="text-sm text-pink-400">Required: ${skill.requiredLevel}%</span>
+                        </div>
+                    </div>
+                    <div class="h-6 bg-gray-800 rounded-full overflow-hidden relative">
+                        <div class="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-600 to-blue-400 opacity-70 skill-your-level" style="width: 0%"></div>
+                        <div class="absolute top-0 left-0 h-full w-1 bg-pink-500 skill-required-level" style="left: 0%"></div>
+                    </div>
+                `;
+
+                skillComparisonContainer.appendChild(skillItem);
+            });
+
+            // Animate skill comparison bars
+            setTimeout(() => {
+                const yourLevelBars = document.querySelectorAll('.skill-your-level');
+                const requiredLevelMarkers = document.querySelectorAll('.skill-required-level');
+
+                skillComparisons.forEach((skill, index) => {
+                    yourLevelBars[index].style.width = `${skill.yourLevel}%`;
+                    requiredLevelMarkers[index].style.left = `${skill.requiredLevel}%`;
+                });
+            }, 300);
+        }
+
+        // Function to generate future career path based on current experience
+        function generateFutureCareerPath(currentCareerData) {
+            console.log('Generating future career path');
+
+            // Ensure we have valid career data
+            if (!currentCareerData || currentCareerData.length === 0) {
+                console.log('No current career data, using default data');
+                // Default career data if none is provided
+                currentCareerData = [
+                    {
+                        title: 'Software Developer',
+                        company: 'Tech Solutions Inc.',
+                        date: '2020 - 2022',
+                        description: 'Developed and maintained web applications using modern JavaScript frameworks.',
+                        skills: ['JavaScript', 'React', 'Node.js', 'CSS'],
+                        achievements: ['Improved application performance by 30%', 'Implemented new features that increased user engagement']
+                    }
+                ];
+            }
+
+            // Get the latest position
+            const latestPosition = currentCareerData[currentCareerData.length - 1];
+
+            // Extract current skills and title for better predictions
+            const currentSkills = latestPosition.skills || [];
+            const currentTitle = latestPosition.title || '';
+
+            // Future career paths based on current position
+            // This would ideally use the Gemini API for personalized predictions
+            // but we'll use predefined paths for now
+
+            // Future career paths for software engineers
+            if (currentTitle.toLowerCase().includes('developer') ||
+                currentTitle.toLowerCase().includes('engineer') ||
+                currentTitle.toLowerCase().includes('programmer')) {
+
+                // Check if they're already senior
+                const isSenior = currentTitle.toLowerCase().includes('senior') ||
+                                currentTitle.toLowerCase().includes('lead') ||
+                                currentTitle.toLowerCase().includes('principal');
+
+                // Check skills to determine specialization direction
+                const hasCloudSkills = currentSkills.some(skill =>
+                    ['aws', 'azure', 'gcp', 'cloud', 'kubernetes', 'docker'].includes(skill.toLowerCase()));
+
+                const hasAISkills = currentSkills.some(skill =>
+                    ['machine learning', 'ml', 'ai', 'tensorflow', 'pytorch', 'data science'].includes(skill.toLowerCase()));
+
+                const hasLeadershipSkills = currentSkills.some(skill =>
+                    ['leadership', 'management', 'team lead'].includes(skill.toLowerCase()));
+
+                // Generate future path based on current skills and position
+                const futurePath = [];
+
+                // First future position
+                if (!isSenior) {
+                    futurePath.push({
+                        title: 'Senior ' + (currentTitle.replace('Junior ', '')),
+                        company: 'Growth Tech Inc.',
+                        date: 'Future (1-2 years)',
+                        description: 'Taking on more responsibility and leadership in development projects. Mentoring junior developers and making architectural decisions.',
+                        skills: [...new Set([...currentSkills, 'Leadership', 'Architecture Design', 'Mentoring'])],
+                        achievements: ['Lead development of key features', 'Improve team productivity by 30%'],
+                        isFuture: true
+                    });
+                } else if (hasCloudSkills) {
+                    futurePath.push({
+                        title: 'Cloud Solutions Architect',
+                        company: 'CloudScale Technologies',
+                        date: 'Future (1-2 years)',
+                        description: 'Designing and implementing scalable cloud infrastructure. Creating migration strategies and optimizing cloud resources.',
+                        skills: [...new Set([...currentSkills, 'Cloud Architecture', 'Cost Optimization', 'Multi-cloud Strategy'])],
+                        achievements: ['Design cloud-native architecture', 'Reduce infrastructure costs by 25%'],
+                        isFuture: true
+                    });
+                } else if (hasAISkills) {
+                    futurePath.push({
+                        title: 'ML Engineering Lead',
+                        company: 'AI Innovations',
+                        date: 'Future (1-2 years)',
+                        description: 'Leading machine learning initiatives and implementing AI solutions. Bridging the gap between data science and production systems.',
+                        skills: [...new Set([...currentSkills, 'MLOps', 'Model Deployment', 'AI Ethics'])],
+                        achievements: ['Deploy ML models to production', 'Improve prediction accuracy by 15%'],
+                        isFuture: true
+                    });
+                } else {
+                    futurePath.push({
+                        title: 'Technical Lead',
+                        company: 'Innovation Labs',
+                        date: 'Future (1-2 years)',
+                        description: 'Leading a team of developers and making technical decisions. Balancing technical excellence with business requirements.',
+                        skills: [...new Set([...currentSkills, 'Team Leadership', 'Project Management', 'Technical Planning'])],
+                        achievements: ['Lead team of 5-7 developers', 'Deliver projects on time and under budget'],
+                        isFuture: true
+                    });
+                }
+
+                // Second future position
+                if (hasLeadershipSkills || isSenior) {
+                    futurePath.push({
+                        title: 'Engineering Manager',
+                        company: 'Tech Leadership Corp.',
+                        date: 'Future (2-4 years)',
+                        description: 'Managing multiple development teams and coordinating technical initiatives. Balancing people management with technical oversight.',
+                        skills: ['People Management', 'Resource Planning', 'Technical Strategy', 'Agile Leadership'],
+                        achievements: ['Grow engineering department by 40%', 'Implement successful agile transformation'],
+                        isFuture: true
+                    });
+                } else if (hasCloudSkills) {
+                    futurePath.push({
+                        title: 'VP of Infrastructure',
+                        company: 'Global Systems Inc.',
+                        date: 'Future (2-4 years)',
+                        description: 'Overseeing all infrastructure and cloud operations. Setting technical direction and managing cloud strategy.',
+                        skills: ['Infrastructure Strategy', 'Team Leadership', 'Budget Management', 'Vendor Relations'],
+                        achievements: ['Scale infrastructure to support 10x growth', 'Establish cloud center of excellence'],
+                        isFuture: true
+                    });
+                } else {
+                    futurePath.push({
+                        title: 'Principal Engineer',
+                        company: 'Elite Tech Solutions',
+                        date: 'Future (2-4 years)',
+                        description: 'Serving as a technical authority across multiple teams. Making high-level architectural decisions and setting technical standards.',
+                        skills: ['System Architecture', 'Technical Leadership', 'Cross-team Collaboration', 'Mentorship'],
+                        achievements: ['Design system architecture for flagship product', 'Establish engineering best practices'],
+                        isFuture: true
+                    });
+                }
+
+                // Third future position
+                futurePath.push({
+                    title: 'CTO',
+                    company: 'Future Innovations',
+                    date: 'Future (4-6 years)',
+                    description: 'Leading all technical aspects of the company. Setting technical vision and strategy while managing the entire engineering organization.',
+                    skills: ['Technical Vision', 'Executive Leadership', 'Strategic Planning', 'Innovation Management'],
+                    achievements: ['Lead digital transformation', 'Drive technical innovation strategy'],
+                    isFuture: true
+                });
+
+                // Fourth future position - entrepreneurial path
+                futurePath.push({
+                    title: 'Founder & CEO',
+                    company: 'Your Own Startup',
+                    date: 'Future (6-8 years)',
+                    description: 'Building your own technology company from the ground up. Applying all your technical and leadership experience to create innovative solutions.',
+                    skills: ['Entrepreneurship', 'Business Development', 'Product Strategy', 'Fundraising'],
+                    achievements: ['Launch successful tech startup', 'Secure venture capital funding'],
+                    isFuture: true
+                });
+
+                // Fifth future position - giving back
+                futurePath.push({
+                    title: 'Technology Advisor & Investor',
+                    company: 'Multiple Ventures',
+                    date: 'Future (8+ years)',
+                    description: 'Advising technology companies and investing in promising startups. Sharing your expertise and helping the next generation of tech leaders.',
+                    skills: ['Strategic Advising', 'Investment Analysis', 'Mentorship', 'Board Leadership'],
+                    achievements: ['Advise portfolio of tech startups', 'Create tech education foundation'],
+                    isFuture: true
+                });
+
+                return futurePath;
+            }
+
+            // Default future path for other careers
+            return [
+                {
+                    title: 'Senior ' + latestPosition.title,
+                    company: 'Future Growth Inc.',
+                    date: 'Future (1-2 years)',
+                    description: 'Taking on more responsibility and leadership in your field. Becoming recognized for your expertise and mentoring others.',
+                    skills: [...new Set([...currentSkills, 'Leadership', 'Strategic Planning', 'Mentoring'])],
+                    achievements: ['Become recognized industry expert', 'Lead major initiatives'],
+                    isFuture: true
+                },
+                {
+                    title: 'Director of ' + latestPosition.title.split(' ')[0],
+                    company: 'Leadership Enterprises',
+                    date: 'Future (2-4 years)',
+                    description: 'Leading a department and setting strategic direction. Balancing leadership responsibilities with hands-on expertise.',
+                    skills: ['Team Leadership', 'Strategic Planning', 'Budget Management', 'Stakeholder Management'],
+                    achievements: ['Grow department by 50%', 'Implement innovative strategies'],
+                    isFuture: true
+                },
+                {
+                    title: 'VP of ' + (latestPosition.title.includes('Developer') ? 'Engineering' : 'Operations'),
+                    company: 'Executive Solutions',
+                    date: 'Future (4-6 years)',
+                    description: 'Joining the executive team and influencing company-wide decisions. Setting vision and strategy for your division.',
+                    skills: ['Executive Leadership', 'Strategic Vision', 'Cross-functional Collaboration', 'Change Management'],
+                    achievements: ['Lead organizational transformation', 'Drive company-wide initiatives'],
+                    isFuture: true
+                },
+                {
+                    title: 'Chief ' + (latestPosition.title.includes('Developer') ? 'Technology' : 'Operations') + ' Officer',
+                    company: 'C-Suite Innovations',
+                    date: 'Future (6-8 years)',
+                    description: 'Serving as a C-level executive and setting company direction. Leading major transformations and strategic initiatives.',
+                    skills: ['Executive Leadership', 'Corporate Strategy', 'Board Relations', 'Organizational Development'],
+                    achievements: ['Drive company valuation growth', 'Lead successful digital transformation'],
+                    isFuture: true
+                },
+                {
+                    title: 'Entrepreneur & Advisor',
+                    company: 'Your Own Venture',
+                    date: 'Future (8+ years)',
+                    description: 'Starting your own business or consulting practice. Applying your expertise to help multiple organizations and possibly investing in promising ventures.',
+                    skills: ['Entrepreneurship', 'Business Development', 'Strategic Advising', 'Investment Analysis'],
+                    achievements: ['Launch successful business', 'Build portfolio of client success stories'],
+                    isFuture: true
+                }
+            ];
+        }
+
+        // Create career timeline visualization
+        function createCareerTimelineVisualization(customCareerPath) {
+            console.log('Initializing career timeline visualization');
+
+            // Use custom career path if provided, otherwise use default data
+            let pastCareerData;
+
+            if (customCareerPath && customCareerPath.length > 0) {
+                console.log('Using custom career path data');
+                // Filter out any items marked as future from the custom data
+                pastCareerData = customCareerPath.filter(item => !item.isFuture);
+            } else {
+                console.log('Using default career path data');
+                // Default past and present career data
+                pastCareerData = [
+                {
+                    title: 'Junior Developer',
+                    company: 'Tech Startup Inc.',
+                    date: 'Jan 2018 - Dec 2019',
+                    description: 'Started as a junior developer working on front-end web applications. Contributed to the development of the company\'s main product using React and JavaScript. Participated in code reviews and agile development processes.',
+                    skills: ['JavaScript', 'React', 'HTML/CSS', 'Git'],
+                    achievements: ['Improved page load time by 30%', 'Implemented responsive design for mobile users']
+                },
+                {
+                    title: 'Software Engineer',
+                    company: 'Digital Solutions Ltd.',
+                    date: 'Jan 2020 - Jun 2021',
+                    description: 'Promoted to full-stack engineer responsible for developing and maintaining web applications. Worked with Node.js backend and React frontend. Collaborated with cross-functional teams to deliver features on time.',
+                    skills: ['JavaScript', 'React', 'Node.js', 'Express', 'MongoDB'],
+                    achievements: ['Led the implementation of a new authentication system', 'Reduced API response time by 40%']
+                },
+                {
+                    title: 'Senior Developer',
+                    company: 'Enterprise Systems Corp.',
+                    date: 'Jul 2021 - Present',
+                    description: 'Working as a senior developer leading a team of 5 engineers. Responsible for architecture decisions, code quality, and mentoring junior developers. Implementing cloud-native solutions and CI/CD pipelines.',
+                    skills: ['JavaScript', 'React', 'Node.js', 'AWS', 'Docker', 'Kubernetes'],
+                    achievements: ['Architected microservice migration', 'Implemented automated testing that increased code coverage by 45%']
+                }
+            ];
+            }
+
+            // Generate future career path based on past experience
+            const futureCareerData = generateFutureCareerPath(pastCareerData);
+
+            // Combine past and future career data
+            const careerData = [...pastCareerData, ...futureCareerData];
+            console.log('Career data with future path:', careerData);
+
+            // Make pastCareerData accessible to other functions
+            window.pastCareerData = pastCareerData;
+
+            // Get the canvas and its context
+            const canvas = document.getElementById('timeline-canvas');
+            if (!canvas) {
+                console.error('Timeline canvas element not found');
+                return;
+            }
+
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                console.error('Could not get 2D context from canvas');
+                return;
+            }
+
+            console.log('Canvas found with dimensions:', canvas.width, 'x', canvas.height);
+
+            // Set canvas dimensions and handle responsiveness
+            function resizeCanvas() {
+                const container = document.getElementById('timeline-container');
+                canvas.width = container.clientWidth;
+                canvas.height = container.clientHeight;
+
+                // Force a minimum height to ensure visibility
+                if (canvas.height < 200) {
+                    canvas.height = 200;
+                }
+
+                // Log canvas dimensions for debugging
+                console.log('Canvas resized to:', canvas.width, 'x', canvas.height);
+
+                // Redraw timeline when resizing
+                if (careerData.length > 0) {
+                    drawTimeline();
+                }
+            }
+
+            // Call resize initially and on window resize
+            setTimeout(resizeCanvas, 100); // Delay initial resize to ensure container is rendered
+            window.addEventListener('resize', resizeCanvas);
+
+            // Add a debounced resize handler to prevent too many redraws
+            let resizeTimeout;
+            window.addEventListener('resize', function() {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(resizeCanvas, 250);
+            });
+
+            // Timeline state
+            let currentPosition = 0;
+            let animationFrame;
+            let isPlaying = false;
+
+            // Timeline controls
+            const prevButton = document.getElementById('timeline-prev');
+            const playButton = document.getElementById('timeline-play');
+            const nextButton = document.getElementById('timeline-next');
+
+            prevButton.addEventListener('click', () => {
+                if (currentPosition > 0) {
+                    currentPosition--;
+                    updateTimelineDetails();
+                    drawTimeline();
+                }
+            });
+
+            nextButton.addEventListener('click', () => {
+                if (currentPosition < careerData.length - 1) {
+                    currentPosition++;
+                    updateTimelineDetails();
+                    drawTimeline();
+                }
+            });
+
+            playButton.addEventListener('click', () => {
+                if (isPlaying) {
+                    // Stop playing
+                    isPlaying = false;
+                    playButton.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    `;
+                    cancelAnimationFrame(animationFrame);
+                } else {
+                    // Start playing
+                    isPlaying = true;
+                    playButton.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    `;
+                    playTimeline();
+                }
+            });
+
+            function playTimeline() {
+                if (!isPlaying) return;
+
+                // Clear any existing timeout to prevent multiple animations
+                if (animationFrame) {
+                    clearTimeout(animationFrame);
+                }
+
+                if (currentPosition < careerData.length - 1) {
+                    currentPosition++;
+                } else {
+                    // Reset to beginning
+                    currentPosition = 0;
+                }
+
+                updateTimelineDetails();
+                drawTimeline();
+
+                // Set timeout for next position
+                animationFrame = setTimeout(playTimeline, 3000);
+            }
+
+            // Draw the timeline visualization
+            function drawTimeline() {
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Log drawing attempt
+                console.log('Drawing timeline with canvas size:', canvas.width, 'x', canvas.height);
+                console.log('Career data length:', careerData.length);
+
+                // Set up dimensions
+                const padding = 40;
+                const nodeRadius = 15;
+                const lineY = canvas.height / 2;
+                const lineWidth = canvas.width - padding * 2;
+                const nodeSpacing = lineWidth / (careerData.length - 1 || 1);
+
+                // Draw timeline line with higher visibility
+                ctx.beginPath();
+                ctx.moveTo(padding, lineY);
+                ctx.lineTo(canvas.width - padding, lineY);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; // Increased opacity
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                // Find the index where future positions start
+                const futureStartIndex = window.pastCareerData ? window.pastCareerData.length : 3; // Default to 3 if pastCareerData not available
+                console.log('Future positions start at index:', futureStartIndex);
+
+                // Draw connecting lines between nodes first (so they appear behind nodes)
+                for (let i = 0; i < careerData.length - 1; i++) {
+                    const x1 = padding + nodeSpacing * i + nodeRadius;
+                    const x2 = padding + nodeSpacing * (i + 1) - nodeRadius;
+
+                    ctx.beginPath();
+                    ctx.moveTo(x1, lineY);
+                    ctx.lineTo(x2, lineY);
+
+                    // Style based on current position and whether it's a future position
+                    if (i < currentPosition) {
+                        // Past positions that have been visited
+                        ctx.strokeStyle = 'rgba(96, 165, 250, 0.9)'; // Blue with increased opacity
+                    } else if (i >= futureStartIndex - 1) {
+                        // Future position connections (the -1 is for the connection from last past to first future)
+                        ctx.strokeStyle = 'rgba(132, 204, 22, 0.6)'; // Lime green for future paths
+                    } else {
+                        // Unvisited past positions
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; // White with increased opacity
+                    }
+
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                }
+
+                // Draw nodes with higher visibility
+                careerData.forEach((position, index) => {
+                    const x = padding + nodeSpacing * index;
+                    const y = lineY;
+
+                    // Check if this is a future position
+                    let isFuture = position.isFuture || (typeof futureStartIndex !== 'undefined' && index >= futureStartIndex);
+
+                    // Add glow effect for all nodes to increase visibility
+                    ctx.beginPath();
+                    ctx.arc(x, y, nodeRadius + 3, 0, Math.PI * 2);
+
+                    if (index === currentPosition) {
+                        // Current selected position
+                        ctx.fillStyle = 'rgba(255, 51, 102, 0.3)';
+                    } else if (index < currentPosition) {
+                        // Past visited position
+                        ctx.fillStyle = 'rgba(96, 165, 250, 0.3)';
+                    } else if (isFuture) {
+                        // Future position
+                        ctx.fillStyle = 'rgba(132, 204, 22, 0.3)'; // Lime green glow for future
+                    } else {
+                        // Unvisited past position
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                    }
+                    ctx.fill();
+
+                    // Draw node
+                    ctx.beginPath();
+                    ctx.arc(x, y, nodeRadius, 0, Math.PI * 2);
+
+                    // Style based on current position and future status with higher contrast
+                    if (index === currentPosition) {
+                        // Current position
+                        ctx.fillStyle = 'rgba(255, 51, 102, 1)';
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+                        ctx.lineWidth = 3;
+                    } else if (index < currentPosition) {
+                        // Past visited position
+                        ctx.fillStyle = 'rgba(96, 165, 250, 0.9)';
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+                        ctx.lineWidth = 2;
+                    } else if (isFuture) {
+                        // Future position
+                        ctx.fillStyle = 'rgba(132, 204, 22, 0.8)'; // Lime green for future
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+                        ctx.lineWidth = 2;
+                    } else {
+                        // Unvisited past position
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                        ctx.lineWidth = 2;
+                    }
+
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Update isFuture status for text rendering
+                    isFuture = position.isFuture || (typeof futureStartIndex !== 'undefined' && index >= futureStartIndex);
+
+                    // Draw position title with improved visibility
+                    ctx.font = index === currentPosition ? 'bold 14px Arial' : '12px Arial';
+
+                    // Different text color for future positions
+                    if (isFuture) {
+                        ctx.fillStyle = index === currentPosition ? 'rgba(132, 204, 22, 1)' : 'rgba(132, 204, 22, 0.9)';
+                    } else {
+                        ctx.fillStyle = index === currentPosition ? 'rgba(255, 255, 255, 1)' : 'rgba(255, 255, 255, 0.8)';
+                    }
+
+                    ctx.textAlign = 'center';
+
+                    // Position title above or below the line alternately for better readability
+                    const textY = index % 2 === 0 ? y - nodeRadius - 15 : y + nodeRadius + 20;
+
+                    // Add a 'Future:' prefix for future positions
+                    const titleText = isFuture ? position.title : position.title;
+                    ctx.fillText(titleText, x, textY);
+
+                    // Draw company name with improved visibility
+                    ctx.font = '10px Arial';
+
+                    // Different company text color for future positions
+                    if (isFuture) {
+                        ctx.fillStyle = 'rgba(132, 204, 22, 0.7)';
+                    } else {
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                    }
+
+                    const companyY = index % 2 === 0 ? textY - 15 : textY + 15;
+                    ctx.fillText(position.company, x, companyY);
+
+                    // For future positions, add a small indicator
+                    if (isFuture) {
+                        const dateY = index % 2 === 0 ? companyY - 15 : companyY + 15;
+                        ctx.fillStyle = 'rgba(132, 204, 22, 0.6)';
+                        ctx.font = 'italic 9px Arial';
+                        ctx.fillText('Future Path', x, dateY);
+                    }
+                });
+
+                // Add extra visual effects for current node
+                if (careerData.length > 0) {
+                    const currentX = padding + nodeSpacing * currentPosition;
+
+                    // Outer glow effect
+                    ctx.beginPath();
+                    ctx.arc(currentX, lineY, nodeRadius + 8, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(255, 51, 102, 0.2)';
+                    ctx.fill();
+
+                    // Pulse animation indicator
+                    console.log('Current position node drawn at:', currentX, lineY);
+                }
+            }
+
+            // Set up canvas click handler
+            canvas.addEventListener('click', function(event) {
+                const rect = canvas.getBoundingClientRect();
+                const clickX = event.clientX - rect.left;
+                const clickY = event.clientY - rect.top;
+
+                // Get current dimensions for calculations
+                const padding = 40;
+                const nodeRadius = 15;
+                const lineY = canvas.height / 2;
+                const lineWidth = canvas.width - padding * 2;
+                const nodeSpacing = lineWidth / (careerData.length - 1 || 1);
+
+                // Check if click is on a node
+                let nodeClicked = false;
+
+                careerData.forEach((pos, idx) => {
+                    const nodeX = padding + nodeSpacing * idx;
+                    const nodeY = lineY;
+
+                    // Calculate distance from click to node center
+                    const distance = Math.sqrt(Math.pow(clickX - nodeX, 2) + Math.pow(clickY - nodeY, 2));
+
+                    // If click is within node radius (make it a bit larger for better UX)
+                    if (distance <= nodeRadius * 1.5) {
+                        nodeClicked = true;
+
+                        // Stop any ongoing animation
+                        if (isPlaying) {
+                            isPlaying = false;
+                            playButton.innerHTML = `
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            `;
+                            clearTimeout(animationFrame);
+                        }
+
+                        currentPosition = idx;
+                        updateTimelineDetails();
+                        drawTimeline();
+                    }
+                });
+
+                if (nodeClicked) {
+                    console.log('Timeline node clicked: Position ' + currentPosition);
+                }
+            });
+
+
+            // Update the details section with current position info
+            function updateTimelineDetails() {
+                const positionTitle = document.getElementById('position-title');
+                const positionDate = document.getElementById('position-date');
+                const positionDescription = document.getElementById('position-description');
+
+                if (!positionTitle || !positionDate || !positionDescription) {
+                    console.error('Timeline detail elements not found');
+                    return;
+                }
+
+                if (careerData.length === 0) {
+                    positionTitle.textContent = 'No career data available';
+                    positionDate.textContent = '';
+                    positionDescription.textContent = 'Upload your resume to see your career timeline';
+                    return;
+                }
+
+                if (currentPosition < 0 || currentPosition >= careerData.length) {
+                    console.error('Invalid current position:', currentPosition);
+                    positionTitle.textContent = 'Select a position';
+                    positionDate.textContent = '';
+                    positionDescription.textContent = 'Click on a position in the timeline to see details';
+                    return;
+                }
+
+                const position = careerData[currentPosition];
+
+                // Check if this is a future position
+                const isFuture = position.isFuture || (window.pastCareerData && currentPosition >= window.pastCareerData.length);
+
+                // Add a future indicator for future positions
+                if (isFuture) {
+                    positionTitle.innerHTML = `<span class="text-lime-400">${position.title}</span> at <span class="text-lime-400">${position.company}</span> <span class="text-xs font-medium px-2 py-1 bg-lime-500 bg-opacity-20 text-lime-300 rounded-full ml-2">Future Path</span>`;
+                } else {
+                    positionTitle.textContent = `${position.title} at ${position.company}`;
+                }
+
+                positionDate.textContent = position.date;
+
+                // Create description with skills and achievements
+                let descriptionHTML = '';
+
+                // Add a future path explanation for future positions
+                if (isFuture) {
+                    descriptionHTML += `<div class="p-2 mb-3 bg-lime-500 bg-opacity-10 border border-lime-500 border-opacity-20 rounded-md">
+                        <p class="text-lime-300 text-sm"><span class="font-medium">🔮 Future Career Path:</span> This is a potential future career step based on your current skills and experience. The timeline shows where your career could go if you continue to develop your skills and take on new challenges.</p>
+                    </div>`;
+                }
+
+                descriptionHTML += `<p class="mb-3">${position.description}</p>`;
+
+                // Add skills
+                if (position.skills && position.skills.length > 0) {
+                    descriptionHTML += '<div class="mb-2"><span class="font-medium">Skills: </span>';
+                    descriptionHTML += position.skills.map(skill => {
+                        // Use different styling for future position skills
+                        if (isFuture) {
+                            return `<span class="inline-block bg-lime-500 bg-opacity-20 text-lime-300 text-xs px-2 py-1 rounded-full mr-1 mb-1">${skill}</span>`;
+                        } else {
+                            return `<span class="inline-block bg-blue-500 bg-opacity-20 text-blue-300 text-xs px-2 py-1 rounded-full mr-1 mb-1">${skill}</span>`;
+                        }
+                    }).join('');
+                    descriptionHTML += '</div>';
+                }
+
+                // Add achievements
+                if (position.achievements && position.achievements.length > 0) {
+                    // Different title for future positions
+                    if (isFuture) {
+                        descriptionHTML += '<div><span class="font-medium text-lime-400">Potential Achievements:</span><ul class="list-disc list-inside mt-1">';
+                    } else {
+                        descriptionHTML += '<div><span class="font-medium">Key Achievements:</span><ul class="list-disc list-inside mt-1">';
+                    }
+
+                    descriptionHTML += position.achievements.map(achievement => {
+                        // Different styling for future achievements
+                        if (isFuture) {
+                            return `<li class="text-sm text-lime-300">${achievement}</li>`;
+                        } else {
+                            return `<li class="text-sm text-gray-300">${achievement}</li>`;
+                        }
+                    }).join('');
+                    descriptionHTML += '</ul></div>';
+                }
+
+                document.getElementById('position-description').innerHTML = descriptionHTML;
+            }
+
+            // Initial draw
+            drawTimeline();
+            updateTimelineDetails();
+
+            // Add a new achievement for exploring the timeline
+            setTimeout(() => {
+                achievementSystem.unlockAchievement('career_explorer');
+            }, 3000);
+        }
+
+        // Copy LinkedIn bio
+        copyBio.addEventListener('click', () => {
+            navigator.clipboard.writeText(linkedinBio.textContent);
+
+            // Show copied feedback
+            const originalText = copyBio.innerHTML;
+            copyBio.innerHTML = `
+                <span class="flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Copied!
+                </span>
+            `;
+
+            setTimeout(() => {
+                copyBio.innerHTML = originalText;
+            }, 2000);
+        });
+
+        // Function to process uploaded file
+        async function processFile(file) {
+            console.log('Processing file:', file.name, file.type, file.size);
+
+            // Show loading section
+            uploadSection.classList.add('hidden');
+            loadingSection.classList.remove('hidden');
+
+            try {
+                // Analyze resume with backend server
+                const analysisResult = await analyzeResumeWithBackend(file);
+
+                if (analysisResult) {
+                    console.log('Analysis result:', analysisResult);
+
+                    // Display results
+                    displayResults(analysisResult);
+
+                    // Show results section
+                    loadingSection.classList.add('hidden');
+                    resultsSection.classList.remove('hidden');
+
+                    // Create visualizations
+                    createIndustryRadarChart(analysisResult.industryMatch);
+                    createResumeScoreVisualization(analysisResult.resumeScore);
+                    createSkillComparisonVisualization(analysisResult.skillComparisons);
+                    createCareerTimelineVisualization(analysisResult.careerPath);
+
+                    // Unlock achievement
+                    if (window.achievementSystem) {
+                        window.achievementSystem.unlockAchievement('resume_analyzed');
+                    }
+                } else {
+                    console.error('Failed to analyze resume');
+                    alert('Failed to analyze resume. Please try again.');
+
+                    // Go back to upload section
+                    loadingSection.classList.add('hidden');
+                    uploadSection.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Error processing file:', error);
+                alert('An error occurred while processing your resume. Please try again.');
+
+                // Go back to upload section
+                loadingSection.classList.add('hidden');
+                uploadSection.classList.remove('hidden');
+            }
+        }
+
+        // Function to display analysis results
+        function displayResults(data) {
+            console.log('Displaying results:', data);
+
+            // Clear previous results
+            jobList.innerHTML = '';
+            skillList.innerHTML = '';
+            improvementList.innerHTML = '';
+
+            // Display job recommendations
+            if (data.jobs && data.jobs.length > 0) {
+                data.jobs.forEach(job => {
+                    const jobItem = document.createElement('div');
+                    jobItem.className = 'job-item glass p-4 mb-4 rounded-lg';
+
+                    // Create stars based on match percentage
+                    const starsCount = Math.round(job.match / 20); // 1-5 stars
+                    let starsHtml = '';
+                    for (let i = 0; i < 5; i++) {
+                        if (i < starsCount) {
+                            starsHtml += '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>';
+                        } else {
+                            starsHtml += '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>';
+                        }
+                    }
+
+                    jobItem.innerHTML = `
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="text-lg font-medium">${job.title}</h3>
+                            <div class="flex">${starsHtml}</div>
+                        </div>
+                        <div class="flex items-center mb-2">
+                            <div class="w-full bg-gray-700 rounded-full h-2.5">
+                                <div class="bg-blue-600 h-2.5 rounded-full" style="width: ${job.match}%"></div>
+                            </div>
+                            <span class="ml-2 text-sm font-medium">${job.match}%</span>
+                        </div>
+                        <p class="text-gray-300">${job.description}</p>
+                    `;
+
+                    jobList.appendChild(jobItem);
+                });
+            }
+
+            // Display skills analysis
+            if (data.skills && data.skills.length > 0) {
+                data.skills.forEach(skill => {
+                    const skillItem = document.createElement('div');
+                    skillItem.className = 'skill-item mb-4';
+
+                    // Create stars based on importance
+                    const starsHtml = Array(skill.importance).fill('<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-blue-400" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>').join('');
+
+                    skillItem.innerHTML = `
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="font-medium">${skill.name}</h4>
+                            <div class="flex">${starsHtml}</div>
+                        </div>
+                        <p class="text-sm text-gray-300">${skill.description}</p>
+                    `;
+
+                    skillList.appendChild(skillItem);
+                });
+            }
+
+            // Display improvement suggestions
+            if (data.improvements && data.improvements.length > 0) {
+                data.improvements.forEach(improvement => {
+                    const improvementItem = document.createElement('div');
+                    improvementItem.className = 'flex items-start';
+                    improvementItem.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-400 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p class="text-gray-300">${improvement}</p>
+                    `;
+
+                    improvementList.appendChild(improvementItem);
+                });
+            }
+
+            // Display LinkedIn bio
+            if (data.linkedinBio) {
+                linkedinBio.textContent = data.linkedinBio;
+            }
+        }
+
+        // Chat functionality
+        chatBubble.addEventListener('click', () => {
+            chatModal.classList.remove('hidden');
+            chatModal.classList.add('scale-in');
+            chatInput.focus();
+        });
+
+        closeChat.addEventListener('click', () => {
+            chatModal.classList.add('hidden');
+            chatModal.classList.remove('scale-in');
+        });
+
+        sendButton.addEventListener('click', sendMessage);
+
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        function sendMessage() {
+            const message = chatInput.value.trim();
+            if (!message) return;
+
+            // Add user message
+            addMessage(message, true);
+
+            // Clear input
+            chatInput.value = '';
+
+            // Simulate response
+            setTimeout(() => {
+                const response = getResponse(message);
+                addMessage(response, false);
+            }, 1000);
+        }
+
+        function addMessage(text, isUser) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = isUser ? 'user-message' : 'assistant-message';
+            messageDiv.textContent = text;
+
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function getResponse(message) {
+            // Advanced responses based on message content analysis
+            const lowerMessage = message.toLowerCase();
+
+            // Greeting patterns
+            if (lowerMessage.match(/^(hi|hello|hey|greetings|howdy|hola)/i)) {
+                return "👋 Hello there! I'm excited to help with your career questions today. What specific area would you like advice on?";
+            }
+
+            // Interview preparation
+            if (lowerMessage.includes('interview')) {
+                if (lowerMessage.includes('question')) {
+                    return "🎯 Common interview questions include:\n\n1. Tell me about yourself\n2. Why do you want to work here?\n3. What are your strengths and weaknesses?\n4. Describe a challenge you faced and how you overcame it\n5. Where do you see yourself in 5 years?\n\nWould you like tips on how to answer any of these specifically?";
+                } else if (lowerMessage.includes('prepare') || lowerMessage.includes('preparation')) {
+                    return "🔍 To prepare for interviews effectively:\n\n1. Research the company thoroughly (values, products, recent news)\n2. Study the job description and match your experiences to requirements\n3. Practice with mock interviews\n4. Prepare the STAR method for behavioral questions (Situation, Task, Action, Result)\n5. Have thoughtful questions ready for the interviewer\n6. Plan your outfit and test your tech if it's a virtual interview";
+                } else if (lowerMessage.includes('nervous') || lowerMessage.includes('anxiety')) {
+                    return "😌 Interview anxiety is completely normal! Try these techniques:\n\n1. Practice deep breathing exercises before the interview\n2. Visualize a successful interview outcome\n3. Prepare thoroughly so you feel confident\n4. Remember that interviewers want you to succeed\n5. Focus on having a conversation rather than being 'tested'\n6. Get a good night's sleep and arrive early to settle your nerves";
+                } else {
+                    return "🤝 For interview success:\n\n1. Research the company culture and values\n2. Practice answering common questions using the STAR method\n3. Prepare specific examples that showcase your skills\n4. Dress professionally and arrive early\n5. Bring extra copies of your resume\n6. Send a thank-you note within 24 hours\n\nWould you like more specific interview advice?";
+                }
+            }
+
+            // Resume advice
+            if (lowerMessage.includes('resume') || lowerMessage.includes('cv')) {
+                if (lowerMessage.includes('ats') || lowerMessage.includes('applicant tracking')) {
+                    return "🤖 To make your resume ATS-friendly:\n\n1. Use standard section headings (Experience, Education, Skills)\n2. Include keywords from the job description\n3. Avoid tables, headers/footers, and complex formatting\n4. Use standard fonts (Arial, Calibri, Times New Roman)\n5. Submit in .docx or .pdf format as specified\n6. Avoid images, charts, or graphics";
+                } else if (lowerMessage.includes('template') || lowerMessage.includes('format')) {
+                    return "📄 Effective resume formats:\n\n1. Chronological: Best for consistent career progression\n2. Functional: Highlights skills over experience (good for career changers)\n3. Combination: Balances skills and experience\n\nFor templates, check LinkedIn's Resume Builder, Microsoft Word templates, or professional sites like Canva and Zety.";
+                } else if (lowerMessage.includes('length') || lowerMessage.includes('page')) {
+                    return "📏 Resume length guidelines:\n\n• 1 page: Early career professionals (0-10 years experience)\n• 2 pages: Mid-career professionals (10+ years experience)\n• 3+ pages: Only for academic CVs, executive roles, or specific industries requiring detailed publications/projects\n\nRemember, quality over quantity - every word should earn its place!";
+                } else {
+                    return "📝 To create a standout resume:\n\n1. Start with a compelling summary statement\n2. Use action verbs and quantify achievements (e.g., 'Increased sales by 20%')\n3. Tailor your resume for each job application\n4. Include relevant keywords from the job description\n5. Focus on achievements rather than just responsibilities\n6. Keep design clean and professional\n7. Proofread carefully for errors\n\nWould you like specific advice on any section?";
+                }
+            }
+
+            // Skills development
+            if (lowerMessage.includes('skill')) {
+                if (lowerMessage.includes('tech') || lowerMessage.includes('technical')) {
+                    return "💻 In-demand technical skills for 2025:\n\n1. AI/Machine Learning\n2. Cloud Computing (AWS, Azure, GCP)\n3. Data Analysis & Visualization\n4. Cybersecurity\n5. Full-stack Development\n6. DevOps\n7. Blockchain\n8. UI/UX Design\n\nThe most valuable approach is to combine technical skills with domain expertise in your industry.";
+                } else if (lowerMessage.includes('soft') || lowerMessage.includes('people')) {
+                    return "🤝 Critical soft skills employers value:\n\n1. Communication (written and verbal)\n2. Adaptability and resilience\n3. Critical thinking and problem-solving\n4. Emotional intelligence\n5. Collaboration and teamwork\n6. Time management\n7. Leadership\n8. Creativity\n\nThese skills are increasingly important as technical tasks become automated.";
+                } else if (lowerMessage.includes('learn') || lowerMessage.includes('improve')) {
+                    return "🌱 To develop new skills efficiently:\n\n1. Online platforms: Coursera, LinkedIn Learning, Udemy, edX\n2. Professional certifications in your field\n3. Volunteer for projects that stretch your abilities\n4. Find a mentor in your target skill area\n5. Join communities and attend workshops\n6. Practice consistently with real-world projects\n7. Teach others what you're learning";
+                } else {
+                    return "🔍 Top skills across industries include:\n\n1. Data literacy\n2. Digital fluency\n3. Critical thinking\n4. Problem-solving\n5. Communication\n6. Adaptability\n7. Collaboration\n8. Creativity\n9. Emotional intelligence\n\nThe most successful professionals combine technical expertise with strong soft skills. Which area would you like to develop?";
+                }
+            }
+
+            // Salary negotiation
+            if (lowerMessage.includes('salary') || lowerMessage.includes('negotiate') || lowerMessage.includes('compensation') || lowerMessage.includes('offer')) {
+                if (lowerMessage.includes('counter') || lowerMessage.includes('respond')) {
+                    return "💬 When countering an offer:\n\n1. Express enthusiasm for the role and company\n2. Present your counter as a discussion, not a demand\n3. Justify your ask with market research and your value\n4. Consider the full package (benefits, work-life balance, growth)\n5. Be prepared to compromise\n6. Get the final offer in writing";
+                } else if (lowerMessage.includes('research') || lowerMessage.includes('worth')) {
+                    return "🔍 To research salary ranges:\n\n1. Glassdoor, PayScale, and Salary.com\n2. Bureau of Labor Statistics\n3. Industry-specific salary surveys\n4. Professional associations\n5. Network with professionals in similar roles\n6. Recruiters who specialize in your field\n\nConsider factors like location, company size, and your experience level.";
+                } else {
+                    return "💰 Salary negotiation tips:\n\n1. Research market rates for your role, experience, and location\n2. Consider your minimum acceptable salary and ideal target\n3. Let the employer make the first offer when possible\n4. Focus on your value and specific achievements\n5. Consider the entire compensation package (benefits, PTO, flexibility)\n6. Practice your negotiation conversation\n7. Get the final agreement in writing\n\nRemember, negotiation is expected and professional!";
+                }
+            }
+
+            // Career transitions
+            if (lowerMessage.includes('transition') || lowerMessage.includes('change') || lowerMessage.includes('switch')) {
+                if (lowerMessage.includes('industry')) {
+                    return "🔄 For switching industries:\n\n1. Identify transferable skills relevant to your target industry\n2. Research thoroughly to understand industry trends and terminology\n3. Network with professionals in your target field\n4. Adjust your resume to highlight relevant experience\n5. Consider additional education or certifications if needed\n6. Be prepared to start at a lower level initially\n7. Craft your 'career change story' to explain your motivation";
+                } else if (lowerMessage.includes('role') || lowerMessage.includes('position')) {
+                    return "🔄 To transition to a new role:\n\n1. Identify skill gaps and develop a learning plan\n2. Take on projects in your current job that build relevant skills\n3. Find a mentor in your desired role\n4. Update your resume to emphasize transferable skills\n5. Consider internal opportunities before external ones\n6. Network with people in your target role\n7. Be patient and persistent - role transitions take time";
+                } else {
+                    return "🔄 Career transition strategy:\n\n1. Self-assessment: Identify your values, interests, and transferable skills\n2. Research potential paths that match your profile\n3. Network with professionals in your target field\n4. Develop new skills through courses, volunteering, or side projects\n5. Reframe your experience to highlight relevant achievements\n6. Consider working with a career coach\n7. Be prepared for potential temporary setbacks\n\nWhat specific transition are you considering?";
+                }
+            }
+
+            // Job search
+            if (lowerMessage.includes('job search') || lowerMessage.includes('find job') || lowerMessage.includes('looking for job') || lowerMessage.includes('job hunt')) {
+                if (lowerMessage.includes('network') || lowerMessage.includes('connect')) {
+                    return "🔗 Effective networking strategies:\n\n1. Update your LinkedIn profile completely\n2. Reconnect with former colleagues and classmates\n3. Join professional associations in your field\n4. Attend industry events and conferences\n5. Participate in online communities and forums\n6. Schedule informational interviews\n7. Follow up consistently and provide value to your connections";
+                } else if (lowerMessage.includes('application') || lowerMessage.includes('apply')) {
+                    return "📝 Job application best practices:\n\n1. Tailor your resume and cover letter for each position\n2. Follow application instructions exactly\n3. Use keywords from the job description\n4. Apply as soon as possible after a job is posted\n5. Track your applications in a spreadsheet\n6. Follow up if you don't hear back within 1-2 weeks\n7. Prepare for interviews as soon as you apply";
+                } else {
+                    return "🔍 Job search strategy:\n\n1. Define your target roles, industries, and companies\n2. Update your resume, LinkedIn, and professional profiles\n3. Set up job alerts on major platforms (LinkedIn, Indeed, etc.)\n4. Research companies and follow them on social media\n5. Network consistently (70-80% of jobs are filled through networking)\n6. Prepare your references\n7. Practice interviewing regularly\n8. Follow up on all applications and interviews\n\nWhat part of your job search is most challenging?";
+                }
+            }
+
+            // LinkedIn
+            if (lowerMessage.includes('linkedin')) {
+                if (lowerMessage.includes('profile') || lowerMessage.includes('optimize')) {
+                    return "👤 LinkedIn profile optimization:\n\n1. Use a professional, current photo and background image\n2. Craft a compelling headline beyond just your job title\n3. Write a summary that tells your professional story\n4. Include rich media (presentations, articles, projects)\n5. Get recommendations from colleagues and managers\n6. Use relevant keywords throughout your profile\n7. Customize your URL\n8. Keep your profile consistently updated";
+                } else if (lowerMessage.includes('network') || lowerMessage.includes('connect')) {
+                    return "🔗 LinkedIn networking tips:\n\n1. Personalize connection requests\n2. Engage regularly with your network's content\n3. Share relevant industry articles and insights\n4. Join and participate in groups related to your field\n5. Follow companies you're interested in\n6. Use the Alumni tool to find connections at specific companies\n7. Be helpful to others without expecting immediate returns";
+                } else {
+                    return "📱 LinkedIn best practices:\n\n1. Complete your profile 100%\n2. Post content regularly (1-3 times per week)\n3. Engage authentically with your network\n4. Use relevant hashtags to increase visibility\n5. Showcase your achievements and projects\n6. Request and provide recommendations\n7. Follow thought leaders in your industry\n8. Set job alerts for roles you're interested in\n\nLinkedIn is the top platform for professional networking - it's worth investing time here!";
+                }
+            }
+
+            // Cover letters
+            if (lowerMessage.includes('cover letter')) {
+                return "📄 Cover letter essentials:\n\n1. Address a specific person when possible\n2. Open with a compelling hook related to the company or role\n3. Highlight 2-3 specific achievements relevant to the position\n4. Explain why you're interested in this particular company\n5. Connect your experience to the job requirements\n6. Keep it concise (3-4 paragraphs, one page)\n7. Close with a clear call to action\n8. Proofread carefully\n\nA great cover letter complements your resume rather than repeating it.";
+            }
+
+            // Personal branding
+            if (lowerMessage.includes('brand') || lowerMessage.includes('personal brand')) {
+                return "🌟 Building your personal brand:\n\n1. Define your unique value proposition\n2. Identify your target audience\n3. Create consistent profiles across platforms\n4. Share your expertise through content creation\n5. Engage in relevant communities\n6. Collect and showcase testimonials\n7. Monitor your online presence regularly\n\nYour personal brand should authentically represent your professional identity and expertise.";
+            }
+
+            // Work-life balance
+            if (lowerMessage.includes('work life') || lowerMessage.includes('burnout') || lowerMessage.includes('stress')) {
+                return "⚖️ Improving work-life balance:\n\n1. Set clear boundaries between work and personal time\n2. Practice saying no to non-essential tasks\n3. Schedule breaks throughout your workday\n4. Use vacation time fully and disconnect when off\n5. Prioritize tasks using techniques like the Eisenhower Matrix\n6. Communicate openly with your manager about workload\n7. Consider flexible work arrangements if available\n8. Make time for hobbies and relationships outside work\n\nSustainable performance requires proper rest and recovery.";
+            }
+
+            // Thank you or appreciation
+            if (lowerMessage.match(/thank|thanks|appreciate|helpful/i)) {
+                return "You're very welcome! I'm glad I could help. Is there anything else you'd like to know about career development or job searching?";
+            }
+
+            // Default response with suggestions
+            return "I can provide advice on many career topics including:\n\n• Resume writing and optimization\n• Interview preparation\n• Salary negotiation\n• Career transitions\n• Skill development\n• Job search strategies\n• LinkedIn optimization\n• Personal branding\n\nWhat specific area would you like help with today?";
+        }
+    </script>
+</body>
+</html>

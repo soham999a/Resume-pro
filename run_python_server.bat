@@ -1,0 +1,6 @@
+@echo off
+echo Installing required packages...
+pip install flask flask-cors openai werkzeug
+
+echo Starting Python Resume Analyzer Server...
+python python_resume_analyzer.py

@@ -1,0 +1,6 @@
+@echo off
+echo Installing required packages...
+pip install google-generativeai
+
+echo Starting Python Resume Analyzer Server with Gemini API...
+python gemini_resume_analyzer.py

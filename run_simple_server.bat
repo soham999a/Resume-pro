@@ -1,0 +1,6 @@
+@echo off
+echo Installing required packages...
+pip install openai
+
+echo Starting Python Resume Analyzer Server...
+python simple_resume_analyzer.py
