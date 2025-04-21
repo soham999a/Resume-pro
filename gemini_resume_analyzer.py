@@ -11,7 +11,7 @@ import tempfile
 import google.generativeai as genai
 
 # Configure Gemini API with the provided key
-GEMINI_API_KEY = "your-gemini-api-key-here"  # Replace with your actual API key
+GEMINI_API_KEY = "AIzaSyDLfhbLXAJWDhQsNe82m58cEo1u2XVwbOU"  # Replace with your actual API key
 
 # Set the API key for Gemini
 genai.configure(api_key=GEMINI_API_KEY)
@@ -169,7 +169,7 @@ def analyze_resume_with_gemini(resume_text):
 
             # Call Gemini API with retry logic
             attempts = 0
-            max_attempts = 3
+            max_attempts = 1
             text = None
 
             while attempts < max_attempts:
